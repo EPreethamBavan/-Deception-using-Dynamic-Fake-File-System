@@ -1,11 +1,11 @@
 from google import genai
 
 # Create the client with your API key (hardcoding for testing; use env var in production)
-client = genai.Client(api_key="AIzaSyAa00tO_v1Uog-McW6TBn6YxLQBXW6tmTU")
+client = genai.Client(api_key="")
 
 # Generate content using Gemini 2.5 Pro
 response = client.models.generate_content(
-    model="gemini-2.5-flash",  # This is the correct model ID as of Dec 2025
+    model="gemini-2.5-pro",  # This is the correct model ID as of Dec 2025
     contents="Explain quantum computing in simple terms."
 )
 

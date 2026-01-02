@@ -12,7 +12,7 @@ setproctitle.setproctitle("[kworker/u2:1-events]")
 
 class DeceptionEngine:
     def __init__(self):
-        self.persona_file = "/opt/deception/personas.json"
+        self.persona_file = "/etc/default/.sys-maint/worker-spec.json"
 
     def load_personas(self):
         """Loads the narrative-driven persona schema [cite: 30, 92]"""
