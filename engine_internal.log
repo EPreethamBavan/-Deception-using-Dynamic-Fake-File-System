@@ -1,0 +1,22 @@
+2026-01-07 23:59:58,001 - INFO - --- Deception Engine Cycle Start ---
+2026-01-08 00:01:20,433 - INFO - LLM Provider initialized with model: gemini-2.5-flash-lite
+2026-01-08 00:01:20,438 - INFO - Loaded Dynamic Personas from Cache
+2026-01-08 00:01:20,439 - INFO - --- Deception Engine Cycle Start ---
+2026-01-08 00:01:20,439 - INFO - Generating Plan for Week 1...
+2026-01-08 00:01:25,325 - INFO - Day 1 Focus: Project Setup & Initial Research
+2026-01-08 00:01:25,325 - INFO - TRIGGER ACTIVATED for svc_ci: Lint Check
+2026-01-08 00:01:25,326 - INFO - Executing Scene [Triggered Response: Lint Check] for User [svc_ci]
+2026-01-08 00:07:14,824 - INFO - --- Deception Engine Cycle Start ---
+2026-01-08 00:07:14,824 - INFO - Day 1 Focus: General Work
+2026-01-08 00:07:44,573 - INFO - --- Deception Engine Cycle Start ---
+2026-01-08 00:07:44,573 - INFO - Day 1 Focus: General Work
+2026-01-08 00:07:44,574 - INFO - [SIMULATION] Advancing time (Simulated)...
+2026-01-08 00:07:44,575 - INFO - --- Cycle Complete ---
+2026-01-08 00:17:29,488 - INFO - --- Deception Engine Cycle Start ---
+2026-01-08 00:17:29,488 - INFO - Day 1 Focus: General Work
+2026-01-08 00:17:29,489 - INFO - [SIMULATION] Advancing time (Simulated)...
+2026-01-08 00:17:29,489 - INFO - --- Cycle Complete ---
+2026-01-08 00:28:15,115 - INFO - --- Deception Engine Cycle Start ---
+2026-01-08 00:28:15,116 - INFO - Day 1 Focus: General Work
+2026-01-08 00:28:15,116 - INFO - [SIMULATION] Advancing time (Simulated)...
+2026-01-08 00:28:15,116 - INFO - --- Cycle Complete ---

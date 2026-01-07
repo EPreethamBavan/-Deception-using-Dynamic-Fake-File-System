@@ -1,0 +1,23 @@
+{
+    "active_defense": {
+        "ports": [
+            8080,
+            2222,
+            2121
+        ],
+        "banner": "Internal Service Error 500: Check Logs\n"
+    },
+    "simulation": {
+        "promotion_cooldown_days": 180,
+        "promotion_chance": 0.10,
+        "loop_sleep_min": 5,
+        "loop_sleep_max": 20
+    },
+    "llm": {
+        "default_model": "gemini-1.5-flash",
+        "developer_prompt_heavy_lines": 100,
+        "high_volume_chance": 0.3,
+        "quick_task_chance": 0.1,
+        "deep_coding_chance": 0.2
+    }
+}

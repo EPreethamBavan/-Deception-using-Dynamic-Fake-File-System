@@ -1,0 +1,20 @@
+{
+    "global_events": [
+        "trigger_lint"
+    ],
+    "users": {
+        "dev_alice": {
+            "last_scene": "Routine Coding (Randomized)",
+            "last_run": 1767719517.7681851
+        },
+        "svc_ci": {
+            "last_scene": "Build Pipeline",
+            "last_run": 1767725694.9141135
+        },
+        "sys_bob": {
+            "last_scene": "Honeytoken Placement (Dynamic)",
+            "last_run": 1767719535.7017627
+        }
+    },
+    "last_run": 0
+}

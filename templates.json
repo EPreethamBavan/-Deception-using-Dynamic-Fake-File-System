@@ -1,0 +1,111 @@
+{
+    "cache": [
+        {
+            "name": "Cached Maintenance",
+            "category": "Routine",
+            "zone": "/tmp",
+            "commands": [
+                "tar -czf backup.tar.gz /var/log",
+                "mv backup.tar.gz /mnt/backup"
+            ]
+        },
+        {
+            "name": "Log Rotation",
+            "category": "Routine",
+            "zone": "/var/log",
+            "commands": [
+                "gzip access.log",
+                "touch access.log",
+                "systemctl reload nginx"
+            ]
+        }
+    ],
+    "honeytoken": [
+        "echo 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE' > .aws/credentials",
+        "echo 'DB_PASSWORD=admin' > config.php"
+    ],
+    "vuln": [
+        "chmod 777 -R /var/www/html/uploads",
+        "echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config"
+    ],
+    "narrative": [
+        {
+            "name": "Narrative Progress (Log)",
+            "category": "Narrative",
+            "zone": "/var/www/project",
+            "commands": [
+                "echo 'Progress on task: {task}' >> work_log.txt",
+                "git add work_log.txt",
+                "git commit -m 'Update: {task}'"
+            ]
+        },
+        {
+            "name": "Narrative Progress (Code)",
+            "category": "Narrative",
+            "zone": "/src/main",
+            "commands": [
+                "echo '# TODO: Finish {task}' >> todo.py",
+                "git commit -m 'WIP: {task}'"
+            ]
+        }
+    ],
+    "fuzzing": {
+        "files": [
+            "utils.py",
+            "config.py",
+            "app.py",
+            "server.go",
+            "routes.js"
+        ],
+        "commit_messages": [
+            "Fix typo",
+            "WIP",
+            "Update logic",
+            "Refactor",
+            "Cleanup",
+            "Hotfix"
+        ]
+    },
+    "typos": {
+        "git": [
+            "gti",
+            "got",
+            "fit"
+        ],
+        "grep": [
+            "gerp",
+            "grpe"
+        ],
+        "echo": [
+            "ehco",
+            "ecoh"
+        ],
+        "ls": [
+            "sl",
+            "l"
+        ],
+        "docker": [
+            "doker",
+            "docekr"
+        ]
+    },
+    "fallback_maintenance": {
+        "name": "Fallback Maintenance",
+        "category": "Routine",
+        "zone": "/tmp",
+        "commands": [
+            "ls -la",
+            "df -h",
+            "free -m"
+        ]
+    },
+    "triggered_response": {
+        "name": "Triggered Response: {keyword}",
+        "category": "Responsive",
+        "zone": "/tmp",
+        "commands": [
+            "echo 'Responding to trigger: {keyword}'",
+            "sleep 2"
+        ]
+    }
+}

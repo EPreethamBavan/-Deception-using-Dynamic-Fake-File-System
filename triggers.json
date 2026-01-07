@@ -1,0 +1,23 @@
+[
+    {
+        "source": "dev_alice",
+        "pattern": "git push",
+        "event": "trigger_build",
+        "target": "svc_ci",
+        "scene_keyword": "Build"
+    },
+    {
+        "source": "dev_alice",
+        "pattern": "commit",
+        "event": "trigger_lint",
+        "target": "svc_ci",
+        "scene_keyword": "Lint Check"
+    },
+    {
+        "source": "sys_bob",
+        "pattern": "alert",
+        "event": "security_scan",
+        "target": "sys_bob",
+        "scene_keyword": "Security Scan"
+    }
+]
