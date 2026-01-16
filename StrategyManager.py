@@ -176,12 +176,17 @@ class StrategyManager:
             if random.random() < 0.5:
                 logger.info("[Hybrid] Triggering Content Auto-Refresh")
                 self.content_manager.refresh_assets()
-                return ("sys_bob", {
-                    "name": "System Maintenance (Asset Refresh)",
-                    "category": "Maintenance",
-                    "zone": "/var/log",
-                    "commands": ["echo 'Maintenance Complete'", "Truncating logs..."]
-                })
+                
+                scene = self.content_manager.get_template("maintenance_refresh")
+                if not scene: # Safe fallback if template missing
+                     scene = {
+                        "name": "System Maintenance (Asset Refresh)",
+                        "category": "Maintenance",
+                        "zone": "/var/log",
+                        "commands": ["echo 'Maintenance Complete'"]
+                     }
+                return ("sys_bob", scene)
+
             elif random.random() < 0.5:
                  # 1% Chance Persona Evolution
                  self.content_manager.evolve_personas()
@@ -193,12 +198,19 @@ class StrategyManager:
                      self.content_manager.generate_breadcrumbs() # Replenish
                      crumb = "echo 'Replenishing breadcrumbs...'"
                  
-                 return ("dev_alice", {
-                     "name": "Accidental Leak (Breadcrumb)",
-                     "category": "Anomaly",
-                     "zone": "/tmp",
-                     "commands": [f"echo '{crumb}' >> debug.log"]
-                 })
+                 tpl = self.content_manager.get_template("breadcrumb_leak")
+                 if tpl:
+                     scene = json.loads(json.dumps(tpl)) # Deep Copy
+                     scene["commands"] = [c.format(crumb=crumb) for c in scene["commands"]]
+                 else:
+                     scene = {
+                         "name": "Accidental Leak (Breadcrumb)",
+                         "category": "Anomaly",
+                         "zone": "/tmp",
+                         "commands": [f"echo '{crumb}' >> debug.log"]
+                     }
+
+                 return ("dev_alice", scene)
 
         else:
             return self.execute_vuln() # Fallback if no content manager

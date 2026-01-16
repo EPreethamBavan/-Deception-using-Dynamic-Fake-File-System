@@ -12,8 +12,12 @@ from ActiveDefense import ActiveDefense
 
 # Configure logging - Stealth Mode (Log to file only)
 # We avoid console output to prevent alerting attackers reading syslog/journalctl
+log_dir = os.getenv("CONFIG_DIR", ".") 
+if os.getenv("CONFIG_DIR"):
+    pass
+
 logging.basicConfig(
-    filename='engine_internal.log',
+    filename='monitor_debug.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     filemode='a'
@@ -22,18 +26,30 @@ logger = logging.getLogger(__name__)
 
 # Load .env manually if python-dotenv not present
 def load_env():
-    if os.path.exists(".env"):
-        with open(".env") as f:
+    config_dir = os.getenv("CONFIG_DIR", ".")
+    env_path = os.path.join(config_dir, ".env")
+    if os.path.exists(env_path):
+        with open(env_path) as f:
+            for line in f:
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    os.environ[k] = v
+    elif os.path.exists(".env"): 
+         with open(".env") as f:
             for line in f:
                 if "=" in line and not line.startswith("#"):
                     k, v = line.strip().split("=", 1)
                     os.environ[k] = v
 
-class DeceptionEngine:
+class SystemMonitor:
     def __init__(self, spec_file="worker-spec.json", plan_file="monthly_plan.json", state_file="state.json", dry_run=False, use_llm=False):
-        self.spec_file = spec_file
-        self.plan_file = plan_file
-        self.state_file = state_file
+        self.config_dir = os.getenv("CONFIG_DIR", ".")
+        
+        # Adjust paths
+        self.spec_file = os.path.join(self.config_dir, spec_file)
+        self.plan_file = os.path.join(self.config_dir, plan_file)
+        self.state_file = os.path.join(self.config_dir, state_file)
+        
         self.dry_run = dry_run
         self.use_llm = use_llm
         
@@ -458,7 +474,23 @@ class DeceptionEngine:
             # Ensure directory exists
             if not os.path.exists(cwd):
                 os.makedirs(cwd, exist_ok=True)
+            
+            # PERSISTENCE: Append to .bash_history for realism
+            try:
+                # Simple heuristic: if we know the home dir from personas, use it
+                # otherwise guess /home/{username}
+                history_file = f"/home/{username}/.bash_history"
+                if username == "root": history_file = "/root/.bash_history"
                 
+                # Force create the home directory if it doesn't exist (Fake FS)
+                os.makedirs(os.path.dirname(history_file), exist_ok=True)
+                
+                # Format: Just the command (Clean, default style)
+                with open(history_file, "a") as hf:
+                    hf.write(f"{cmd}\n")
+            except Exception as e:
+                logger.warning(f"Failed to update bash_history: {e}")
+
             # TODO: Switch user context via 'sudo -u' if running as root
             # For this implementation, we run as current user but log appropriately
             
@@ -583,29 +615,7 @@ class DeceptionEngine:
                 logger.info(f"[PROJECT TRACKER] Detected new file: {created_file}")
                 self.content_manager.update_file_index(created_file, "Auto-generated file")
 
-    def _update_project_state(self, cmd, cwd):
-        """Heuristic to track creation of new files for Project State."""
-        # Simple heuristic: look for 'touch', '>', 'mkdir'
-        if not self.content_manager: return
-        
-        parts = cmd.split()
-        created_file = None
-        
-        if "touch" in parts:
-            idx = parts.index("touch")
-            if idx + 1 < len(parts): created_file = parts[idx+1]
-        elif ">" in parts:
-            idx = parts.index(">")
-            if idx + 1 < len(parts): created_file = parts[idx+1]
-            
-        if created_file:
-            # Resolve path
-            if not created_file.startswith("/"):
-                created_file = os.path.join(cwd, created_file)
-            
-            # Update Content Manager
-            logger.info(f"[PROJECT TRACKER] Detected new file: {created_file}")
-            self.content_manager.update_file_index(created_file, "Auto-generated file")
+
 
 
 
@@ -627,13 +637,13 @@ if __name__ == "__main__":
     parser.add_argument("--strategy-cache", action="store_true", help="Force Cache Usage Strategy")
     parser.add_argument("--strategy-honeytoken", action="store_true", help="Force Honeytoken Generation")
     parser.add_argument("--strategy-vuln", action="store_true", help="Force Vulnerability Simulation")
-    parser.add_argument("--strategy-forecast", action="store_true", help="Force Forecast Usage Strategy")
-    parser.add_argument("--strategy-hybrid", action="store_true", help="Enable Hybrid 'Professional' Mode")
-
+    parser.add_argument("--strategy-hybrid", action="store_true", help="Enable Hybrid Mode (Professional)")
+    parser.add_argument("--strategy-noise", action="store_true", help="Enable Noise Mode")
+    
     args = parser.parse_args()
     
     # Init Engine
-    engine = DeceptionEngine(dry_run=args.dry_run, use_llm=args.llm or args.generate_forecast or args.refresh_content or args.generate_monthly or args.strategy_hybrid)
+    engine = SystemMonitor(dry_run=args.dry_run, use_llm=args.llm or args.generate_forecast or args.refresh_content or args.generate_monthly or args.strategy_hybrid)
 
     # 1. Handle Management Tasks
     if args.refresh_content:
@@ -655,7 +665,7 @@ if __name__ == "__main__":
     elif args.strategy_cache: active_strategy = "cache"
     elif args.strategy_honeytoken: active_strategy = "honeytoken"
     elif args.strategy_vuln: active_strategy = "vuln"
-    elif args.strategy_forecast: active_strategy = "forecast"
+    # elif args.strategy_forecast: active_strategy = "forecast" # Removed
     elif args.strategy_hybrid: active_strategy = "hybrid"
 
     if args.loop:

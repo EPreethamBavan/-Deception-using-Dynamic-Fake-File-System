@@ -14,12 +14,49 @@ class ContentManager:
     """
     def __init__(self, llm_provider, cache_file="content_cache.json"):
         self.llm = llm_provider
-        self.cache_file = cache_file
-        self.cache = self._load_cache()
+        self.config_dir = os.getenv("CONFIG_DIR", ".")
+        self.cache_file = os.path.join(self.config_dir, cache_file)
         self.cache = self._load_cache()
         self.config = {} # Init before load
+        self.project_state_file = os.path.join(self.config_dir, "project_state.json")
         self.load_dynamic_files()
         self.load_project_state()
+        self._ensure_git_environment()
+
+    def _ensure_git_environment(self):
+        """Creates dummy git repositories for personas to avoid 'not a git repo' errors."""
+        personas = self.load_personas(os.path.join(self.config_dir, "worker_spec.json"))
+        for user, data in personas.items():
+            # Heuristic: If they are a dev, give them a repo
+            if "dev" in user or "skills" in data and "git" in data["skills"]:
+                home = data.get("home_dir", f"/home/{user}")
+                # Create a typical repo path that the LLM might hallucinate
+                # We see queries like /home/dev_alice/repos/core-services-migration
+                common_repos = ["core-services-migration", "backend-api", "frontend-app"]
+                
+                base_repo_dir = os.path.join(home, "repos")
+                # Since we are operating on the REAL file system (or fake one depending on implementation),
+                # we should try to physically create these folders if we can.
+                # NOTE: This runs as the service user (root).
+                if not os.path.exists(base_repo_dir):
+                    try:
+                        os.makedirs(base_repo_dir)
+                    except:
+                        pass # Permission issues or non-existent parent
+
+                for repo in common_repos:
+                    repo_path = os.path.join(base_repo_dir, repo)
+                    if not os.path.exists(repo_path):
+                        try:
+                            os.makedirs(repo_path)
+                            # Init git
+                            import subprocess
+                            subprocess.run(["git", "init"], cwd=repo_path, capture_output=True)
+                            subprocess.run(["git", "config", "user.email", f"{user}@company.com"], cwd=repo_path, capture_output=True)
+                            subprocess.run(["git", "config", "user.name", user], cwd=repo_path, capture_output=True)
+                            logger.info(f"Initialized fake git repo at {repo_path}")
+                        except Exception as e:
+                            logger.warning(f"Failed to init git repo {repo_path}: {e}")
 
     def _load_cache(self):
         if os.path.exists(self.cache_file):
@@ -29,7 +66,7 @@ class ContentManager:
             except:
                 return self._init_empty_cache()
         return self._init_empty_cache()
-
+        
     def _init_empty_cache(self):
         return {
             "forecast_queue": [],
@@ -46,7 +83,7 @@ class ContentManager:
     # --- Feature: Project State Management (The "Brain") ---
     def load_project_state(self):
         """Loads the persistent state of the virtual project (codebase)."""
-        self.project_state_file = "project_state.json"
+        # project_state_file path is set in __init__
         if os.path.exists(self.project_state_file):
             with open(self.project_state_file, 'r') as f:
                 self.project_state = json.load(f)
@@ -107,7 +144,10 @@ class ContentManager:
             logger.info("Loaded Dynamic Personas from Cache")
             return self.cache["personas"]
         
-        # Fallback
+        # Adjust path if relative
+        if not os.path.isabs(default_spec_file):
+            default_spec_file = os.path.join(self.config_dir, default_spec_file)
+
         # Fallback
         if os.path.exists(default_spec_file):
              with open(default_spec_file) as f:
@@ -214,9 +254,14 @@ class ContentManager:
         self.triggers = []
         self.templates = {}
         
+        # Paths
+        triggers_path = os.path.join(self.config_dir, "triggers.json")
+        templates_path = os.path.join(self.config_dir, "templates.json")
+        config_path = os.path.join(self.config_dir, "config.json")
+
         # 1. Triggers
-        if os.path.exists("triggers.json"):
-            with open("triggers.json") as f:
+        if os.path.exists(triggers_path):
+            with open(triggers_path) as f:
                 self.triggers = json.load(f)
         else:
             self.triggers = [
@@ -238,8 +283,8 @@ class ContentManager:
             self.save_triggers()
         
         # 2. Templates
-        if os.path.exists("templates.json"):
-            with open("templates.json") as f:
+        if os.path.exists(templates_path):
+            with open(templates_path) as f:
                 self.templates = json.load(f)
         else:
             self.templates = {
@@ -254,6 +299,18 @@ class ContentManager:
                     "category": "Routine",
                     "zone": "/home/dev_alice",
                     "commands": ["echo 'Starting task: {task}'", "ls -la"]
+                },
+                "maintenance_refresh": {
+                    "name": "System Maintenance (Asset Refresh)",
+                    "category": "Maintenance",
+                    "zone": "/var/log",
+                    "commands": ["echo 'Maintenance Complete'", "Truncating logs..."]
+                },
+                "breadcrumb_leak": {
+                    "name": "Accidental Leak (Breadcrumb)",
+                    "category": "Anomaly",
+                    "zone": "/tmp",
+                    "commands": ["echo '{crumb}' >> debug.log"]
                 },
                 "cache": {
                     "name": "Cached Maintenance", 
@@ -272,17 +329,17 @@ class ContentManager:
                 "vuln": ["chmod 777 -R /var/www"],
                 "honeytoken": ["echo 'aws_key=AKIA...' > ~/.aws/credentials"]
             }
-            with open("templates.json", "w") as f:
+            with open(templates_path, "w") as f:
                 json.dump(self.templates, f, indent=4)
 
-        if os.path.exists("config.json"):
-            with open("config.json") as f:
+        if os.path.exists(config_path):
+            with open(config_path) as f:
                 self.config = json.load(f)
         else:
             self.config = {}
 
     def save_triggers(self):
-        with open("triggers.json", "w") as f:
+        with open(os.path.join(self.config_dir, "triggers.json"), "w") as f:
             json.dump(self.triggers, f, indent=4)
 
     def evolve_triggers(self):

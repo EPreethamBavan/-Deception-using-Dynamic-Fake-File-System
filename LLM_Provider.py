@@ -34,6 +34,32 @@ class LLMProvider:
             with open("config.json") as f:
                 self.config = json.load(f)
 
+    def _call_llm(self, prompt, retries=3):
+        if not self.model: 
+            logger.error("LLM Call Failed: No API Key configured.")
+            return None
+
+        for attempt in range(retries):
+            try:
+                response = self.model.generate_content(prompt)
+                text = response.text
+                # Clean markdown
+                text = text.replace("```json", "").replace("```", "").strip()
+                return json.loads(text)
+            except Exception as e:
+                error_str = str(e)
+                if "429" in error_str or "quota" in error_str.lower():
+                    wait_time = (2 ** attempt) * 5  # Exponential backoff: 5, 10, 20s
+                    # Try to parse specific delay if available (simple heuristic)
+                    logger.warning(f"LLM Rate Limit Hit. Waiting {wait_time}s before retry {attempt+1}/{retries}...")
+                    import time
+                    time.sleep(wait_time)
+                    continue
+                
+                logger.error(f"LLM Error: {e}")
+                return None
+        return None
+
     def generate_scene(self, persona_name, persona_data, context):
         """Generates a single scene (Standard Mode)."""
         prompt = self._construct_prompt(persona_name, persona_data, context)
