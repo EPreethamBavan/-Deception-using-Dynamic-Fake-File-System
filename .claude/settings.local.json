@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:arxiv.org)",
+      "Bash(python:*)",
+      "Bash(powershell -Command \"Compress-Archive -Force -Path ''sys_core.py'',''LLM_Provider.py'',''ContentManager.py'',''StrategyManager.py'',''ActiveDefense.py'',''AntiFingerprint.py'',''UserArtifactGenerator.py'',''PromptEngine.py'',''setup_linux.sh'',''requirements.txt'',''worker-spec.json'',''config.json'',''templates.json'',''triggers.json'',''monthly_plan.json'',''DEPLOYMENT.md'',''.env.example'',''test_deception.py'' -DestinationPath ''deception-engine-deploy.zip''\")",
+      "Bash(powershell -Command \"Get-ChildItem ''deception-engine-deploy.zip'' | Select-Object Name, @{N=''Size\\(KB\\)'';E={[math]::Round\\($_Length/1KB,2\\)}}; Write-Host ''''; Write-Host ''Contents:''; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::OpenRead\\(\\(Resolve-Path ''deception-engine-deploy.zip''\\)\\).Entries | ForEach-Object { Write-Host \\(''  '' + $_Name + '' \\('' + [math]::Round\\($_Length/1KB,2\\) + '' KB\\)''\\) }\")",
+      "Bash(dir:*)",
+      "Bash(powershell -Command \"\\(Get-Item ''C:\\\\Users\\\\preet\\\\Desktop\\\\Research Paper\\\\ADUD\\\\Deception using Dynamic Fake File System\\\\deception-engine-deploy.zip''\\).Length / 1KB\")",
+      "Bash(powershell -Command \"Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::OpenRead\\(''C:\\\\Users\\\\preet\\\\Desktop\\\\Research Paper\\\\ADUD\\\\Deception using Dynamic Fake File System\\\\deception-engine-deploy.zip''\\).Entries | Select-Object Name, Length | Format-Table -AutoSize\")",
+      "Bash(findstr:*)"
+    ]
+  }
+}

@@ -1,14 +1,49 @@
 import os
+import sys
 import json
 import random
 import time
 import argparse
 import logging
+import signal
 from datetime import datetime
 from LLM_Provider import LLMProvider
 from StrategyManager import StrategyManager
 from ContentManager import ContentManager
 from ActiveDefense import ActiveDefense
+
+# New research-based modules
+try:
+    from AntiFingerprint import (
+        AntiFingerprintManager,
+        BashHistoryManager,
+        AttackerBehaviorDetector,
+        RealisticTimestampManager
+    )
+    from UserArtifactGenerator import (
+        UserArtifactGenerator,
+        SessionPersistenceManager,
+        MetricsCollector
+    )
+    from PromptEngine import (
+        SPADEPromptEngine,
+        AdaptivePromptSelector,
+        ContextState
+    )
+    ENHANCED_MODE = True
+except ImportError as e:
+    logging.warning(f"Enhanced modules not available: {e}. Running in basic mode.")
+    ENHANCED_MODE = False
+
+# Global flag for graceful shutdown
+shutdown_requested = False
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully."""
+    global shutdown_requested
+    signal_name = signal.Signals(signum).name
+    logger.info(f"Received {signal_name} signal. Initiating graceful shutdown...")
+    shutdown_requested = True
 
 # Configure logging - Stealth Mode (Log to file only)
 # We avoid console output to prevent alerting attackers reading syslog/journalctl
@@ -44,20 +79,20 @@ def load_env():
 class SystemMonitor:
     def __init__(self, spec_file="worker-spec.json", plan_file="monthly_plan.json", state_file="state.json", dry_run=False, use_llm=False):
         self.config_dir = os.getenv("CONFIG_DIR", ".")
-        
+
         # Adjust paths
         self.spec_file = os.path.join(self.config_dir, spec_file)
         self.plan_file = os.path.join(self.config_dir, plan_file)
         self.state_file = os.path.join(self.config_dir, state_file)
-        
+
         self.dry_run = dry_run
         self.use_llm = use_llm
-        
+
         self.llm_provider = LLMProvider() if self.use_llm else None
-        
+
         # Initialize Content Manager (Modular Asset Storage)
         self.content_manager = ContentManager(self.llm_provider) if self.use_llm else None
-        
+
         # Dynamic Personas via ContentManager if available, else static
         if self.content_manager:
             self.personas = self.content_manager.load_personas(self.spec_file)
@@ -66,13 +101,13 @@ class SystemMonitor:
 
         self.monthly_plan = self._load_json(self.plan_file)
         self.state = self._init_state()
-        
+
         self.strategy_manager = StrategyManager(self)
-        
+
         # Active Defense (Honeyports)
         ad_ports = [8080, 2222, 2121]
         ad_banner = b"Internal Service Error 500: Check Logs\n"
-        
+
         if self.content_manager and hasattr(self.content_manager, 'config'):
             ad_config = self.content_manager.config.get("active_defense", {})
             ad_ports = ad_config.get("ports", ad_ports)
@@ -82,6 +117,70 @@ class SystemMonitor:
         self.active_defense = ActiveDefense(ports=ad_ports, banner=ad_banner)
         if not self.dry_run:
             self.active_defense.start()
+
+        # ===== ENHANCED MODE: Research-based improvements =====
+        if ENHANCED_MODE:
+            logger.info("Initializing Enhanced Deception Mode...")
+
+            # Anti-fingerprinting system
+            self.anti_fingerprint = AntiFingerprintManager(self.config_dir)
+
+            # Attacker behavior detector
+            self.behavior_detector = AttackerBehaviorDetector()
+
+            # Bash history managers (per persona)
+            self.history_managers = {}
+            for name, data in self.personas.items():
+                self.history_managers[name] = BashHistoryManager(
+                    name,
+                    data.get('home_dir', f'/home/{name}'),
+                    data
+                )
+
+            # User artifact generator
+            self.artifact_generator = UserArtifactGenerator(self.personas, self.config_dir)
+
+            # Session persistence
+            self.session_manager = SessionPersistenceManager(
+                os.path.join(self.config_dir, ".sessions")
+            )
+
+            # Metrics collector
+            self.metrics = MetricsCollector(
+                os.path.join(self.config_dir, "deception_metrics.json")
+            )
+
+            # SPADE Prompt Engine
+            self.prompt_engine = SPADEPromptEngine(self.personas)
+            self.adaptive_selector = AdaptivePromptSelector(self.prompt_engine)
+
+            # Generate initial user artifacts if not dry-run
+            if not self.dry_run:
+                self._initialize_user_artifacts()
+
+            logger.info("Enhanced Deception Mode initialized successfully.")
+        else:
+            self.anti_fingerprint = None
+            self.behavior_detector = None
+            self.history_managers = {}
+            self.artifact_generator = None
+            self.session_manager = None
+            self.metrics = None
+            self.prompt_engine = None
+            self.adaptive_selector = None
+
+    def _initialize_user_artifacts(self):
+        """Initialize realistic user artifacts for all personas."""
+        if not self.artifact_generator:
+            return
+
+        logger.info("Generating initial user artifacts...")
+        for persona_name in self.personas.keys():
+            try:
+                self.artifact_generator.generate_all_artifacts(persona_name)
+                logger.info(f"  - Generated artifacts for {persona_name}")
+            except Exception as e:
+                logger.warning(f"  - Failed to generate artifacts for {persona_name}: {e}")
 
     def _load_json(self, filepath):
         try:
@@ -155,29 +254,32 @@ class SystemMonitor:
     # --- Layer 2: Script Picker (Hybrid Static/LLM) ---
     def select_scene(self, persona_name, persona_data, context=None, force_llm=False):
         """Selects a scene based on weighted categories or Calls LLM."""
-        
+
         # 1. Decide whether to use LLM (Contextual Injection)
         should_use_llm = self.use_llm and (force_llm or random.random() < 0.5 or not persona_data.get('scenes'))
-        
+
         if should_use_llm:
             logger.info(f"[LLM] Generating dynamic scene for {persona_name} (Forced: {force_llm})...")
-            
-            # Construct rich context for the new prompt engine
+
+            # === ENHANCED: Use SPADE Prompt Engine ===
+            if ENHANCED_MODE and self.prompt_engine and self.adaptive_selector:
+                return self._generate_scene_with_spade(persona_name, persona_data, context)
+
+            # Construct rich context for the basic prompt engine
             if not context:
-                 # Minimal fallback context if none provided
-                 current_day = str(datetime.now().day)
-                 daily_task = self.monthly_plan.get('daily_tasks', {}).get(current_day, "General Maintenance")
-                 narrative_arc = self.monthly_plan.get('narrative_arc', "Routine Operations")
-                 
-                 context = {
+                current_day = str(datetime.now().day)
+                daily_task = self.monthly_plan.get('daily_tasks', {}).get(current_day, "General Maintenance")
+                narrative_arc = self.monthly_plan.get('narrative_arc', "Routine Operations")
+
+                context = {
                     "monthly_plan": {
                         "narrative_arc": narrative_arc,
                         "current_day": current_day,
                         "daily_task": daily_task
                     },
                     "recent_history": self.state.get('users', {}).get(persona_name, {}).get('last_scene', "None")
-                 }
-                 
+                }
+
             return self.llm_provider.generate_scene(persona_name, persona_data, context)
 
         # 2. Fallback to Static Selection
@@ -186,7 +288,7 @@ class SystemMonitor:
             return None
 
         last_scene = self.state.get('users', {}).get(persona_name, {}).get('last_scene')
-        
+
         r = random.random()
         if r < 0.70:
             target_cat = "Routine"
@@ -202,8 +304,45 @@ class SystemMonitor:
         pool = [s for s in eligible if s['name'] != last_scene]
         if not pool:
             pool = eligible
-            
+
         return random.choice(pool)
+
+    def _generate_scene_with_spade(self, persona_name, persona_data, context):
+        """Generate scene using SPADE-style structured prompts."""
+        # Build context state
+        current_day = 1
+        if self.content_manager:
+            current_day = self.content_manager.project_state.get('current_day', 1)
+
+        # Get recent commands from session manager
+        recent_commands = []
+        if self.session_manager:
+            recent_commands = self.session_manager.get_command_history(persona_name, 10)
+
+        # Get threat level from behavior detector
+        threat_level = "none"
+        fingerprint_detected = False
+        if self.behavior_detector:
+            threat_level = self.behavior_detector.get_threat_level()
+            fingerprint_detected = self.behavior_detector.should_adapt_behavior()
+
+        context_state = ContextState(
+            current_day=current_day,
+            narrative_arc=self.monthly_plan.get('narrative_arc', "Routine Operations"),
+            daily_task=self.monthly_plan.get('daily_tasks', {}).get(str(current_day), "General Work"),
+            recent_commands=recent_commands,
+            files_modified=list(self.content_manager.project_state.get('created_files', {}).keys())[:5] if self.content_manager else [],
+            current_project=self.content_manager.project_state.get('project_name', 'main-project') if self.content_manager else 'project',
+            build_status=self.content_manager.project_state.get('build_status', 'passing') if self.content_manager else 'unknown',
+            threat_level=threat_level,
+            fingerprint_detected=fingerprint_detected
+        )
+
+        # Generate adaptive prompt
+        prompt = self.adaptive_selector.generate_adaptive_prompt(persona_name, context_state)
+
+        # Call LLM with enhanced prompt
+        return self.llm_provider._call_llm(prompt)
 
     # --- Layer 3: Story Planner (Narrative Injection) ---
     def get_monthly_task(self):
@@ -462,50 +601,65 @@ class SystemMonitor:
     def _run_command_raw(self, username, cmd, cwd):
         """Executes a shell command for a specific user in a specific directory."""
         import subprocess
-        
+
         logger.info(f"[{username}] $ {cmd} (cwd={cwd})")
-        
+
+        # === ENHANCED: Detect fingerprinting attempts ===
+        if ENHANCED_MODE and self.behavior_detector:
+            detection = self.behavior_detector.analyze_command(cmd)
+            if detection:
+                logger.warning(f"[SECURITY] Fingerprinting detected: {detection['pattern']}")
+                if self.metrics:
+                    self.metrics.record_command(username, is_fingerprint=True)
+
         if self.dry_run:
             # Simulation Mode
             return "Simulated Output", None
-            
+
         # Real Execution
         try:
             # Ensure directory exists
             if not os.path.exists(cwd):
                 os.makedirs(cwd, exist_ok=True)
-            
-            # PERSISTENCE: Append to .bash_history for realism
-            try:
-                # Simple heuristic: if we know the home dir from personas, use it
-                # otherwise guess /home/{username}
-                history_file = f"/home/{username}/.bash_history"
-                if username == "root": history_file = "/root/.bash_history"
-                
-                # Force create the home directory if it doesn't exist (Fake FS)
-                os.makedirs(os.path.dirname(history_file), exist_ok=True)
-                
-                # Format: Just the command (Clean, default style)
-                with open(history_file, "a") as hf:
-                    hf.write(f"{cmd}\n")
-            except Exception as e:
-                logger.warning(f"Failed to update bash_history: {e}")
 
-            # TODO: Switch user context via 'sudo -u' if running as root
-            # For this implementation, we run as current user but log appropriately
-            
+            # === ENHANCED: Use timestamped bash history ===
+            if ENHANCED_MODE and username in self.history_managers:
+                # Use the enhanced history manager with realistic timestamps
+                self.history_managers[username].add_command(cmd)
+                self.history_managers[username].flush_to_file()
+            else:
+                # Fallback to basic history
+                try:
+                    history_file = f"/home/{username}/.bash_history"
+                    if username == "root":
+                        history_file = "/root/.bash_history"
+
+                    os.makedirs(os.path.dirname(history_file), exist_ok=True)
+
+                    # Enhanced format with timestamp (HISTTIMEFORMAT style)
+                    with open(history_file, "a") as hf:
+                        hf.write(f"#{int(time.time())}\n")
+                        hf.write(f"{cmd}\n")
+                except Exception as e:
+                    logger.warning(f"Failed to update bash_history: {e}")
+
+            # === ENHANCED: Record metrics ===
+            if ENHANCED_MODE and self.metrics:
+                self.metrics.record_command(username, is_fingerprint=False)
+
+            # Execute command
             result = subprocess.run(
-                f"cd {cwd} && {cmd}", 
-                shell=True, 
-                capture_output=True, 
-                text=True, 
+                f"cd {cwd} && {cmd}",
+                shell=True,
+                capture_output=True,
+                text=True,
                 timeout=30
             )
-            
+
             if result.returncode != 0:
                 return result.stdout, result.stderr
             return result.stdout, None
-            
+
         except subprocess.TimeoutExpired:
             return None, "Command Timed Out"
         except Exception as e:
@@ -621,63 +775,125 @@ class SystemMonitor:
 
 if __name__ == "__main__":
     load_env()
-    parser = argparse.ArgumentParser(description="Deception Engine Orchestrator")
-    parser.add_argument("--dry-run", action="store_true", help="Run in simulation mode (no system changes)")
-    parser.add_argument("--loop", action="store_true", help="Run continuously")
-    parser.add_argument("--llm", action="store_true", help="Enable LLM dynamic scene generation")
-    
+
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
+    parser = argparse.ArgumentParser(
+        description="Deception Engine Orchestrator - Dynamic Fake File System",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s --dry-run --llm --strategy-hybrid    # Test without making changes
+  %(prog)s --loop --llm --strategy-hybrid       # Production mode
+  %(prog)s --generate-monthly --llm             # Generate new monthly plan
+  %(prog)s --refresh-content --llm              # Refresh honeytokens/vulns
+        """
+    )
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Run in simulation mode (no system changes)")
+    parser.add_argument("--loop", action="store_true",
+                        help="Run continuously until stopped")
+    parser.add_argument("--llm", action="store_true",
+                        help="Enable LLM dynamic scene generation")
+
     # Management Flags
-    parser.add_argument("--generate-forecast", type=int, help="Generate N batch scenes for forecasting")
-    parser.add_argument("--generate-monthly", action="store_true", help="Generate a new dynamic monthly narrative plan")
-    parser.add_argument("--refresh-content", action="store_true", help="Refresh dynamic content assets (vulns/tokens)")
+    mgmt_group = parser.add_argument_group('Management Commands')
+    mgmt_group.add_argument("--generate-forecast", type=int, metavar="N",
+                            help="Generate N batch scenes for forecasting")
+    mgmt_group.add_argument("--generate-monthly", action="store_true",
+                            help="Generate a new dynamic monthly narrative plan")
+    mgmt_group.add_argument("--refresh-content", action="store_true",
+                            help="Refresh dynamic content assets (vulns/tokens)")
 
     # Strategy Flags
-    parser.add_argument("--strategy-monthly", action="store_true", help="Force Monthly Plan Strategy")
-    parser.add_argument("--strategy-template", action="store_true", help="Force Template Randomization Strategy")
-    parser.add_argument("--strategy-cache", action="store_true", help="Force Cache Usage Strategy")
-    parser.add_argument("--strategy-honeytoken", action="store_true", help="Force Honeytoken Generation")
-    parser.add_argument("--strategy-vuln", action="store_true", help="Force Vulnerability Simulation")
-    parser.add_argument("--strategy-hybrid", action="store_true", help="Enable Hybrid Mode (Professional)")
-    parser.add_argument("--strategy-noise", action="store_true", help="Enable Noise Mode")
-    
+    strat_group = parser.add_argument_group('Strategy Selection (mutually exclusive)')
+    strat_group.add_argument("--strategy-monthly", action="store_true",
+                             help="Force Monthly Plan Strategy")
+    strat_group.add_argument("--strategy-template", action="store_true",
+                             help="Force Template Randomization Strategy")
+    strat_group.add_argument("--strategy-cache", action="store_true",
+                             help="Force Cache Usage Strategy")
+    strat_group.add_argument("--strategy-honeytoken", action="store_true",
+                             help="Force Honeytoken Generation")
+    strat_group.add_argument("--strategy-vuln", action="store_true",
+                             help="Force Vulnerability Simulation")
+    strat_group.add_argument("--strategy-hybrid", action="store_true",
+                             help="Enable Hybrid Mode (Professional - Recommended)")
+    strat_group.add_argument("--strategy-noise", action="store_true",
+                             help="Enable Noise Mode")
+
     args = parser.parse_args()
-    
+
     # Init Engine
-    engine = SystemMonitor(dry_run=args.dry_run, use_llm=args.llm or args.generate_forecast or args.refresh_content or args.generate_monthly or args.strategy_hybrid)
+    logger.info("Initializing Deception Engine...")
+    engine = SystemMonitor(
+        dry_run=args.dry_run,
+        use_llm=args.llm or args.generate_forecast or args.refresh_content or args.generate_monthly or args.strategy_hybrid
+    )
 
     # 1. Handle Management Tasks
     if args.refresh_content:
         engine.refresh_content()
-        exit(0)
-    
+        sys.exit(0)
+
     if args.generate_monthly:
         engine.generate_monthly_plan()
-        exit(0)
-    
+        sys.exit(0)
+
     if args.generate_forecast:
         engine.generate_forecast(args.generate_forecast)
-        exit(0)
+        sys.exit(0)
 
-    # 2. Handle Runtime
+    # 2. Determine Active Strategy
     active_strategy = None
-    if args.strategy_monthly: active_strategy = "monthly"
-    elif args.strategy_template: active_strategy = "template"
-    elif args.strategy_cache: active_strategy = "cache"
-    elif args.strategy_honeytoken: active_strategy = "honeytoken"
-    elif args.strategy_vuln: active_strategy = "vuln"
-    # elif args.strategy_forecast: active_strategy = "forecast" # Removed
-    elif args.strategy_hybrid: active_strategy = "hybrid"
+    if args.strategy_monthly:
+        active_strategy = "monthly"
+    elif args.strategy_template:
+        active_strategy = "template"
+    elif args.strategy_cache:
+        active_strategy = "cache"
+    elif args.strategy_honeytoken:
+        active_strategy = "honeytoken"
+    elif args.strategy_vuln:
+        active_strategy = "vuln"
+    elif args.strategy_hybrid:
+        active_strategy = "hybrid"
+    elif args.strategy_noise:
+        active_strategy = "noise"
 
+    # 3. Run Engine
     if args.loop:
+        logger.info(f"Starting continuous operation (Strategy: {active_strategy or 'default'})...")
         try:
-            while True:
+            while not shutdown_requested:
                 engine.run(strategy_flag=active_strategy)
-                sleep_time = random.randint(5, 10) 
-                logger.info(f"Sleeping for {sleep_time}s...")
-                time.sleep(sleep_time)
+
+                # Configurable sleep with jitter
+                base_sleep = 5
+                jitter = random.randint(0, 10)
+                sleep_time = base_sleep + jitter
+
+                logger.info(f"Cycle complete. Sleeping for {sleep_time}s...")
+
+                # Interruptible sleep (check shutdown flag)
+                for _ in range(sleep_time):
+                    if shutdown_requested:
+                        break
+                    time.sleep(1)
+
         except KeyboardInterrupt:
-            logger.info("Engine stopped.")
-            if engine.active_defense: engine.active_defense.stop()
+            logger.info("Keyboard interrupt received.")
+        finally:
+            logger.info("Shutting down gracefully...")
+            if engine.active_defense:
+                engine.active_defense.stop()
+            engine._save_state()
+            logger.info("Deception Engine stopped.")
     else:
+        # Single run mode
         engine.run(strategy_flag=active_strategy)
-        if engine.active_defense: engine.active_defense.stop()
+        if engine.active_defense:
+            engine.active_defense.stop()
+        logger.info("Single cycle complete.")

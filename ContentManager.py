@@ -2,6 +2,7 @@ import json
 import os
 import random
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class ContentManager:
 
     def _ensure_git_environment(self):
         """Creates dummy git repositories for personas to avoid 'not a git repo' errors."""
-        personas = self.load_personas(os.path.join(self.config_dir, "worker_spec.json"))
+        personas = self.load_personas(os.path.join(self.config_dir, "worker-spec.json"))
         for user, data in personas.items():
             # Heuristic: If they are a dev, give them a repo
             if "dev" in user or "skills" in data and "git" in data["skills"]:

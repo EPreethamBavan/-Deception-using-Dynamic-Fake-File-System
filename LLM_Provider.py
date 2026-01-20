@@ -35,29 +35,85 @@ class LLMProvider:
                 self.config = json.load(f)
 
     def _call_llm(self, prompt, retries=3):
-        if not self.model: 
+        """
+        Call the LLM with retry logic and robust JSON parsing.
+
+        Args:
+            prompt: The prompt to send to the LLM
+            retries: Number of retry attempts for rate limiting
+
+        Returns:
+            Parsed JSON response or None on failure
+        """
+        if not self.model:
             logger.error("LLM Call Failed: No API Key configured.")
             return None
+
+        import re
+        import time
 
         for attempt in range(retries):
             try:
                 response = self.model.generate_content(prompt)
                 text = response.text
-                # Clean markdown
-                text = text.replace("```json", "").replace("```", "").strip()
-                return json.loads(text)
+
+                # Robust JSON extraction
+                # 1. Remove markdown code blocks
+                text = re.sub(r'```json\s*', '', text)
+                text = re.sub(r'```\s*', '', text)
+                text = text.strip()
+
+                # 2. Try to find JSON object or array boundaries
+                json_match = re.search(r'(\{[\s\S]*\}|\[[\s\S]*\])', text)
+                if json_match:
+                    text = json_match.group(1)
+
+                # 3. Parse JSON
+                parsed = json.loads(text)
+
+                # 4. Basic validation for scene objects
+                if isinstance(parsed, dict):
+                    # Ensure required fields exist for scene objects
+                    if 'commands' in parsed:
+                        if not isinstance(parsed['commands'], list):
+                            parsed['commands'] = [str(parsed['commands'])]
+                        # Filter out empty commands
+                        parsed['commands'] = [c for c in parsed['commands'] if c and str(c).strip()]
+
+                    # Ensure zone is absolute path
+                    if 'zone' in parsed and not parsed['zone'].startswith('/'):
+                        parsed['zone'] = '/tmp'
+
+                return parsed
+
+            except json.JSONDecodeError as e:
+                logger.warning(f"JSON Parse Error (attempt {attempt+1}): {e}")
+                logger.debug(f"Raw response: {text[:500]}...")
+
+                # Try one more extraction method - find first { to last }
+                try:
+                    start = text.find('{')
+                    end = text.rfind('}')
+                    if start != -1 and end != -1 and end > start:
+                        return json.loads(text[start:end+1])
+                except:
+                    pass
+
+                if attempt < retries - 1:
+                    continue
+                return None
+
             except Exception as e:
                 error_str = str(e)
                 if "429" in error_str or "quota" in error_str.lower():
                     wait_time = (2 ** attempt) * 5  # Exponential backoff: 5, 10, 20s
-                    # Try to parse specific delay if available (simple heuristic)
                     logger.warning(f"LLM Rate Limit Hit. Waiting {wait_time}s before retry {attempt+1}/{retries}...")
-                    import time
                     time.sleep(wait_time)
                     continue
-                
+
                 logger.error(f"LLM Error: {e}")
                 return None
+
         return None
 
     def generate_scene(self, persona_name, persona_data, context):
@@ -461,13 +517,13 @@ class LLMProvider:
     def _construct_prompt(self, name, data, context=None):
         # 1. Unpack Context
         home = data.get('home_dir', '/tmp')
-        
+
         # Default Context
         ctx_arc = "General System Maintenance"
         ctx_day = "Unknown"
         ctx_task = "Routine checkups"
         recent_history = "None"
-        
+
         if context:
             recent_history = context.get('recent_history', 'None')
             # Check if we have rich monthly context
@@ -482,12 +538,12 @@ class LLMProvider:
 
         # 2. Define Persona Role & Voice
         role_description = f"User: {name}\nHome Directory: {home}\nRole Type: "
-        
+
         if "dev" in name:
             role_description += "Software Developer"
             specific_instructions = """
             **BEHAVIOR**:
-            - You are writing code, compiling, or debugging. 
+            - You are writing code, compiling, or debugging.
             - Use realistic tools: git, vim/n, make, docker, kubectl, python, go.
             - If the task is 'Refactor', show `mv`, `sed`, or heavy git activity.
             - If the task is 'Feature', show `mkdir`, `touch`, and content injection.
@@ -517,20 +573,20 @@ class LLMProvider:
         **CURRENT OBJECTIVE (Monthly Arc)**: "{ctx_arc}"
         **TODAY'S PROGRESS**: Day {ctx_day}
         **SPECIFIC TASK**: "{ctx_task}"
-        
+
         *Your generated command history must DIRECTLY contribute to this specific task.*
         """
 
         # 4. Intensity & Realism modifiers
         intensity_cfg = self.config.get("llm", {})
         deep_coding_chance = intensity_cfg.get("deep_coding_chance", 0.2)
-        
+
         is_deep_work = random.random() < deep_coding_chance
-        
+
         if is_deep_work:
             work_instruction = """
             **MODE: DEEP WORK (High Detail)**
-            - The user is doing substantial work. 
+            - The user is doing substantial work.
             - GENERATE ACTUAL CONTENT: Use `cat <<EOF > filename` to create realistic code/config files.
             - The code/config should be syntactically correct and relevant to the Task.
             - Don't just `echo "code"`, write a small python function or valid json config.
@@ -538,7 +594,7 @@ class LLMProvider:
         else:
             work_instruction = """
             **MODE: STANDARD ACTIVITY**
-            - Efficient command usage. 
+            - Efficient command usage.
             - Navigation, checking status, short edits, git operations.
             """
 
@@ -546,25 +602,25 @@ class LLMProvider:
         prompt = f"""
         # SYSTEM INSTRUCTION: CYBER DECEPTION ENGINE
         You are simulating a realistic human (or bot) interaction with a Linux shell to deceive an adversary watching the logs.
-        
+
         ## 1. PERSONA PROFILE
         {role_description}
         {specific_instructions}
-        
+
         ## 2. PLANNING CONTEXT
         {planning_context}
-        
+
         ## 3. HISTORY
         Last Activity: {recent_history}
-        
+
         ## 4. INSTRUCTIONS
         {work_instruction}
-        
+
         **TASK**: Generate a structured 'Scene' object representing this user's next set of actions.
         - Ensure a logical flow (e.g., cd -> ls -> edit -> run).
         - Commands must be valid bash.
         - 'zone' is the absolute path where this happens.
-        
+
         ## 5. OUTPUT FORMAT
         Return ONLY valid JSON. No markdown formatting.
         {{
@@ -578,20 +634,5 @@ class LLMProvider:
             ]
         }}
         """
-        
+
         return prompt
-
-    def _call_llm(self, prompt):
-        if not self.model: 
-            logger.error("LLM Call Failed: No API Key configured.")
-            return None
-
-        try:
-            response = self.model.generate_content(prompt)
-            text = response.text
-            # Clean markdown
-            text = text.replace("```json", "").replace("```", "").strip()
-            return json.loads(text)
-        except Exception as e:
-            logger.error(f"LLM Error: {e}")
-            return None

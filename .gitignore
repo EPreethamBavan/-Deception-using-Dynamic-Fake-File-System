@@ -1,0 +1,43 @@
+# Environment and Secrets
+.env
+*.env
+.env.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+env/
+.venv/
+
+# Runtime State (regenerated)
+state.json
+content_cache.json
+project_state.json
+monitor_debug.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test outputs
+*.log
+
+# Deployment artifacts
+*.zip
+*.tar.gz
+sys_integrity_bundle.zip
+
+# Legacy files
+legacy_archive/
+paper/

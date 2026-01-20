@@ -1,0 +1,6 @@
+# Deception Engine Dependencies
+# Core LLM Integration
+google-generativeai>=0.3.0
+
+# Optional: For enhanced logging (uncomment if needed)
+# python-json-logger>=2.0.0
