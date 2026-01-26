@@ -19,7 +19,8 @@ A research implementation for creating plausible, stochastic honeypot behavior u
 │   └── sys_monitor.log    # Main system log
 ├── src/                   # Source code (future)
 ├── docs/                  # Documentation
-├── legacy_archive/        # Legacy code
+├── legacy_archive/        # Legacy code (old modules)
+├── legacy_archive_2/      # Archived test scripts/zips
 ├── paper/                 # Research paper
 ├── sys_core.py           # Main orchestrator
 ├── LLM_Provider.py       # Gemini API integration
@@ -34,7 +35,7 @@ A research implementation for creating plausible, stochastic honeypot behavior u
 ├── create_bundle.sh      # Bundle creation script
 ├── DEPLOYMENT.md         # Deployment guide
 ├── set_dev_env.bat       # Development environment setup (Windows)
-└── test_*.py            # Test scripts
+└── tests/                # Test suite
 ```
 
 ## Development Setup
