@@ -47,12 +47,17 @@ def signal_handler(signum, frame):
 
 # Configure logging - Stealth Mode (Log to file only)
 # We avoid console output to prevent alerting attackers reading syslog/journalctl
-log_dir = os.getenv("CONFIG_DIR", ".") 
+log_dir = os.getenv("CONFIG_DIR", ".")
 if os.getenv("CONFIG_DIR"):
-    pass
+    log_dir = os.path.join(os.path.dirname(os.getenv("CONFIG_DIR")), "logs")
+else:
+    log_dir = "."
+
+# Ensure log directory exists
+os.makedirs(log_dir, exist_ok=True)
 
 logging.basicConfig(
-    filename='monitor_debug.log',
+    filename=os.path.join(log_dir, 'sys_monitor.log'),
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     filemode='a'
@@ -612,13 +617,112 @@ class SystemMonitor:
                 if self.metrics:
                     self.metrics.record_command(username, is_fingerprint=True)
 
+
         if self.dry_run:
             # Simulation Mode
             return "Simulated Output", None
+            
+        # Delegate to the function that handles path creation AND execution
+        return self._execute_and_ensure_paths(cmd, cwd, username)
+
+    def _execute_and_ensure_paths(self, cmd, cwd, username):
+        """
+        Intelligently analyze a command, create necessary directories, and EXECUTE it.
+        This makes the deception engine behave like a 'living' system that creates
+        its own workspace as it works.
+        """
+        import re
+
+        try:
+            # Parse command to extract paths
+            parts = cmd.split()
+            if not parts:
+                return
+
+            base_cmd = parts[0]
+
+            # Commands that create or write to files/directories
+            if base_cmd in ['mkdir', 'touch', 'vim', 'nano', 'echo', 'cat', 'cp', 'mv', 'ln']:
+                # Extract paths from command arguments
+                for part in parts[1:]:
+                    # Skip flags (start with -)
+                    if part.startswith('-'):
+                        continue
+                    # Skip redirects and pipes
+                    if part in ['>', '>>', '<', '|']:
+                        break
+
+                    # Check if it looks like a file path
+                    if '/' in part or part.startswith('~/'):
+                        path = os.path.expanduser(part)  # Handle ~ expansion
+                        if not os.path.isabs(path):
+                            path = os.path.join(cwd, path)
+
+                        # Get directory part
+                        dir_path = os.path.dirname(path)
+                        if dir_path and dir_path != '/' and not os.path.exists(dir_path):
+                            logger.info(f"[{username}] Creating directory for command: {dir_path}")
+                            os.makedirs(dir_path, exist_ok=True)
+
+            elif base_cmd == 'cd':
+                # cd command - ensure target directory exists
+                if len(parts) > 1:
+                    target = parts[1]
+                    if not os.path.isabs(target):
+                        target = os.path.join(cwd, target)
+
+                    if not os.path.exists(target):
+                        logger.info(f"[{username}] Creating directory for cd: {target}")
+                        os.makedirs(target, exist_ok=True)
+
+            elif base_cmd == 'git' and len(parts) > 1:
+                # Git clone - ensure parent directory exists
+                if parts[1] == 'clone' and len(parts) > 2:
+                    # Last argument is usually the target directory
+                    target_dir = parts[-1]
+                    if not os.path.isabs(target_dir):
+                        target_dir = os.path.join(cwd, target_dir)
+
+                    parent_dir = os.path.dirname(target_dir)
+                    if parent_dir and not os.path.exists(parent_dir):
+                        logger.info(f"[{username}] Creating parent directory for git clone: {parent_dir}")
+                        os.makedirs(parent_dir, exist_ok=True)
+
+            elif base_cmd in ['tar', 'zip', 'unzip'] and len(parts) > 2:
+                # Archive operations - ensure target directories exist
+                for part in parts[2:]:
+                    if not part.startswith('-') and '/' in part:
+                        path = os.path.expanduser(part)
+                        if not os.path.isabs(path):
+                            path = os.path.join(cwd, path)
+
+                        dir_path = os.path.dirname(path)
+                        if dir_path and not os.path.exists(dir_path):
+                            logger.info(f"[{username}] Creating directory for archive: {dir_path}")
+                            os.makedirs(dir_path, exist_ok=True)
+
+            # Special case: rsync operations
+            elif base_cmd == 'rsync':
+                for part in parts[1:]:
+                    if not part.startswith('-') and '/' in part:
+                        path = os.path.expanduser(part)
+                        if not os.path.isabs(path):
+                            path = os.path.join(cwd, path)
+
+                        # For rsync destination, ensure parent directory exists
+                        if not path.endswith('/') and parts.index(part) == len(parts) - 1:
+                            dir_path = os.path.dirname(path)
+                            if dir_path and not os.path.exists(dir_path):
+                                logger.info(f"[{username}] Creating directory for rsync: {dir_path}")
+                                os.makedirs(dir_path, exist_ok=True)
+
+        except Exception as e:
+            logger.warning(f"Failed to analyze command paths: {e}")
+            # Don't fail execution if path analysis fails
 
         # Real Execution
         try:
-            # Ensure directory exists
+            # Ensure working directory exists
             if not os.path.exists(cwd):
                 os.makedirs(cwd, exist_ok=True)
 
@@ -665,6 +769,22 @@ class SystemMonitor:
         except Exception as e:
             return None, str(e)
 
+
+    def _interpolate_text(self, text, context):
+        """Replaces placeholders in text with values from context."""
+        if not isinstance(text, str):
+            return text
+        try:
+            return text.format(**context)
+        except KeyError as e:
+            # If a key is missing, log warning but keep original text (or partial)
+            # Creating a 'safe' format might be better, but for now simple format
+            logger.warning(f"Interpolation missing key {e} in: {text}")
+            return text
+        except Exception as e:
+            logger.warning(f"Interpolation failed for {text}: {e}")
+            return text
+
     def execute_scene_with_feedback(self, username, scene):
         """Executes commands and handles simulated errors via LLM feedback."""
         logger.info(f"Executing Scene [{scene['name']}] for User [{username}]")
@@ -674,12 +794,39 @@ class SystemMonitor:
         self.state['users'][username]['last_scene'] = scene['name']
         self.state['users'][username]['last_run'] = time.time()
         
-        home_dir = self.personas[username].get('home_dir', '/tmp')
-        target_dir = scene.get('zone', home_dir)
+        # Build context for interpolation
+        persona = self.personas.get(username, {})
+        home_dir = persona.get('home_dir', f'/home/{username}')
+        
+        context = {
+            "username": username,
+            "user": username,
+            "home_dir": home_dir,
+            "home": home_dir,
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "random_id": ''.join(random.choices('0123456789abcdef', k=8))
+        }
+
+        # Interpolate Scene Data
+        scene_name = self._interpolate_text(scene.get('name', 'Unknown Scene'), context)
+        target_dir_raw = scene.get('zone', home_dir)
+        target_dir = self._interpolate_text(target_dir_raw, context)
+        
+        # Ensure target dir is valid (fix if someone used partial path thinking it's relative)
+        if not os.path.isabs(target_dir):
+             # Heuristic: if it looks like a relative repo path, anchor it to home
+             if "repos" in target_dir:
+                 target_dir = os.path.join(home_dir, target_dir)
+             else:
+                 target_dir = os.path.join(home_dir, target_dir)
 
         MAX_RETRIES = 3
 
-        for cmd in scene['commands']:
+        commands = scene.get('commands', [])
+        # Interpolate commands
+        interpolated_commands = [self._interpolate_text(cmd, context) for cmd in commands]
+
+        for cmd in interpolated_commands:
             # Run Safely with Retry Loop
             success = False
             retries = 0

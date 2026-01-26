@@ -15,10 +15,10 @@ env/
 .venv/
 
 # Runtime State (regenerated)
-state.json
-content_cache.json
-project_state.json
-monitor_debug.log
+config/state.json
+config/content_cache.json
+config/project_state.json
+logs/*.log
 
 # IDE
 .vscode/

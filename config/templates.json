@@ -1,22 +1,35 @@
 {
     "cache": [
         {
-            "name": "Cached Maintenance",
-            "category": "Routine",
-            "zone": "/tmp",
-            "commands": [
-                "tar -czf backup.tar.gz /var/log",
-                "mv backup.tar.gz /mnt/backup"
-            ]
-        },
-        {
-            "name": "Log Rotation",
+            "name": "System Log Maintenance",
             "category": "Routine",
             "zone": "/var/log",
             "commands": [
-                "gzip access.log",
-                "touch access.log",
-                "systemctl reload nginx"
+                "sudo logrotate -f /etc/logrotate.conf",
+                "sudo systemctl reload rsyslog",
+                "df -h /var/log",
+                "find /var/log -name '*.gz' -mtime +7 -delete"
+            ]
+        },
+        {
+            "name": "Nginx Log Rotation",
+            "category": "Routine",
+            "zone": "/var/log/nginx",
+            "commands": [
+                "sudo nginx -t",
+                "sudo systemctl reload nginx",
+                "tail -20 /var/log/nginx/access.log",
+                "tail -20 /var/log/nginx/error.log"
+            ]
+        },
+        {
+            "name": "Backup Operations",
+            "category": "Routine",
+            "zone": "/mnt/backup",
+            "commands": [
+                "tar -czf /mnt/backup/config-$(date +%Y%m%d).tar.gz /etc/nginx /etc/ssh",
+                "rsync -av /var/log/ /mnt/backup/logs/",
+                "find /mnt/backup -name '*.tar.gz' -mtime +30 -delete"
             ]
         }
     ],
@@ -32,7 +45,7 @@
         {
             "name": "Narrative Progress (Log)",
             "category": "Narrative",
-            "zone": "/var/www/project",
+            "zone": "{home_dir}/repos/backend-api",
             "commands": [
                 "echo 'Progress on task: {task}' >> work_log.txt",
                 "git add work_log.txt",
@@ -42,9 +55,10 @@
         {
             "name": "Narrative Progress (Code)",
             "category": "Narrative",
-            "zone": "/src/main",
+            "zone": "{home_dir}/repos/backend-api/src",
             "commands": [
                 "echo '# TODO: Finish {task}' >> todo.py",
+                "git add todo.py",
                 "git commit -m 'WIP: {task}'"
             ]
         }
@@ -90,22 +104,23 @@
         ]
     },
     "fallback_maintenance": {
-        "name": "Fallback Maintenance",
+        "name": "System Health Check",
         "category": "Routine",
-        "zone": "/tmp",
+        "zone": "{home_dir}",
         "commands": [
-            "ls -la",
+            "uptime",
             "df -h",
-            "free -m"
+            "free -h",
+            "ps aux | head -20"
         ]
     },
     "triggered_response": {
         "name": "Triggered Response: {keyword}",
         "category": "Responsive",
-        "zone": "/tmp",
+        "zone": "{home_dir}",
         "commands": [
-            "echo 'Responding to trigger: {keyword}'",
-            "sleep 2"
+            "echo 'Detected trigger: {keyword}' >> /var/log/triggers.log",
+            "date >> /var/log/triggers.log"
         ]
     }
 }

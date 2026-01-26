@@ -125,6 +125,14 @@ install_source() {
             exit 1
         fi
     done
+
+    # Copy tests directory
+    if [[ -d "tests" ]]; then
+        cp -r "tests" "$SRC_DIR/"
+        log_info "  - Copied tests directory"
+    else
+        log_warn "  - Tests directory not found (optional)"
+    fi
 }
 
 # ============================================

@@ -277,9 +277,10 @@ class SPADEPromptEngine:
         ]
     }
 
-    def __init__(self, personas: Dict = None):
+    def __init__(self, personas: Dict = None, llm_provider=None):
         """Initialize the prompt engine."""
         self.personas = personas or {}
+        self.llm_provider = llm_provider
         self._load_custom_profiles()
 
     def _load_custom_profiles(self):
@@ -369,7 +370,20 @@ class SPADEPromptEngine:
 **CRITICAL:** You must behave EXACTLY like this person. Your commands should reflect their expertise level, habits, and role-specific tasks. An attacker analyzing the logs should believe this is a real person."""
 
     def _build_goal(self, profile: PersonaProfile, context: ContextState, mode: str) -> str:
-        """Build the goal/task section."""
+        """Build the goal/task section with dynamic paths."""
+        # Generate dynamic paths for this persona
+        dynamic_paths = {}
+        if self.llm_provider:
+            try:
+                dynamic_paths = self.llm_provider.generate_dynamic_paths(
+                    profile.name, 
+                    {"home_dir": profile.home_dir}, 
+                    {"monthly_arc": context.narrative_arc, "daily_task": context.daily_task}
+                )
+            except Exception as e:
+                logger.warning(f"Failed to generate dynamic paths for {profile.name}: {e}")
+                dynamic_paths = self._get_fallback_paths(profile)
+
         base_goal = f"""Generate a realistic sequence of shell commands that {profile.full_name} would execute right now.
 
 **Current Context:**
@@ -378,6 +392,25 @@ class SPADEPromptEngine:
 - Today's Focus: "{context.daily_task}"
 - Build Status: {context.build_status}
 - Current Project: {context.current_project}"""
+
+        # Add dynamic environment information
+        if dynamic_paths:
+            base_goal += f"""
+
+**WORKING ENVIRONMENT:**
+- Current Workspace: {dynamic_paths.get('current_workspace', profile.home_dir)}"""
+            
+            if 'active_projects' in dynamic_paths:
+                base_goal += f"""
+- Active Projects: {', '.join(dynamic_paths['active_projects'])}"""
+            
+            if 'log_dirs' in dynamic_paths:
+                base_goal += f"""
+- System Logs: {', '.join(dynamic_paths['log_dirs'])}"""
+            
+            if 'workspaces' in dynamic_paths:
+                base_goal += f"""
+- Build Workspaces: {', '.join(dynamic_paths['workspaces'])}"""
 
         if context.recent_commands:
             base_goal += f"""
@@ -511,6 +544,38 @@ Return ONLY valid JSON. No markdown, no explanation, no commentary.
 - `category`: Must be one of the three options
 - `zone`: Must be an absolute path that exists or can be created
 - `commands`: Array of 3-15 valid bash commands"""
+
+    def _get_fallback_paths(self, profile: PersonaProfile):
+        """Fallback paths when LLM generation fails."""
+        if "dev" in profile.name.lower():
+            return {
+                "active_projects": [f"{profile.home_dir}/repos/backend-api", f"{profile.home_dir}/repos/frontend"],
+                "archived_projects": [f"{profile.home_dir}/archive/old-projects"],
+                "personal_dirs": [f"{profile.home_dir}/notes", f"{profile.home_dir}/scripts"],
+                "config_files": [f"{profile.home_dir}/.gitconfig"],
+                "current_workspace": f"{profile.home_dir}/repos/backend-api"
+            }
+        elif "sys" in profile.name.lower() or "admin" in profile.name.lower():
+            return {
+                "log_dirs": ["/var/log", "/var/log/nginx"],
+                "config_dirs": ["/etc/nginx", "/etc/ssh"],
+                "backup_dirs": ["/mnt/backup"],
+                "monitoring_scripts": [f"{profile.home_dir}/scripts/monitor.sh"],
+                "current_workspace": "/var/log"
+            }
+        elif "svc" in profile.name.lower() or "ci" in profile.name.lower():
+            return {
+                "workspaces": ["/var/lib/jenkins/workspace/backend-api"],
+                "artifacts": ["/var/lib/jenkins/artifacts"],
+                "scripts": ["/var/lib/jenkins/scripts/deploy.sh"],
+                "current_workspace": "/var/lib/jenkins/workspace/backend-api"
+            }
+        else:
+            return {
+                "personal_dirs": [f"{profile.home_dir}/documents"],
+                "config_files": [f"{profile.home_dir}/.bashrc"],
+                "current_workspace": profile.home_dir
+            }
 
 
 class AdaptivePromptSelector:

@@ -23,5 +23,6 @@ for model_name in models_to_test:
         model = genai.GenerativeModel(model_name)
         response = model.generate_content("Hello")
         print(f"SUCCESS! (Response length: {len(response.text)})")
+        print(f"Response Preview: {response.text[:50]}...")
     except Exception as e:
         print(f"FAILED: {str(e)[:100]}...")

@@ -25,11 +25,9 @@ tar -czvf deception-engine.tar.gz \
     ActiveDefense.py \
     setup_linux.sh \
     requirements.txt \
-    worker-spec.json \
-    config.json \
-    templates.json \
-    triggers.json \
-    monthly_plan.json
+    config/ \
+    logs/
+
 
 # Transfer to server
 scp deception-engine.tar.gz user@server:/tmp/
@@ -80,12 +78,12 @@ sudo systemctl status sys-integrity-daemon
 
 | File | Purpose |
 |------|---------|
-| `.env` | API keys and secrets |
-| `config.json` | Active defense ports, simulation parameters |
-| `worker-spec.json` | Persona definitions (users, schedules, scenes) |
-| `templates.json` | Command templates for different scenarios |
-| `triggers.json` | Cross-user trigger rules |
-| `monthly_plan.json` | Long-term narrative arc |
+| `config/.env` | API keys and secrets |
+| `config/config.json` | Active defense ports, simulation parameters |
+| `config/worker-spec.json` | Persona definitions (users, schedules, scenes) |
+| `config/templates.json` | Command templates for different scenarios |
+| `config/triggers.json` | Cross-user trigger rules |
+| `config/monthly_plan.json` | Long-term narrative arc |
 
 ## Management Commands
 

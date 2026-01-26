@@ -28,11 +28,138 @@ class LLMProvider:
             self.model = None
             logger.warning("No API Key provided. LLM Provider in MOCK mode.")
             
-        # Load Config
-        self.config = {}
-        if os.path.exists("config.json"):
-            with open("config.json") as f:
-                self.config = json.load(f)
+    def generate_dynamic_paths(self, persona_name, persona_data, context=None):
+        """
+        Generate realistic, dynamic working paths for a persona.
+        This creates a 'living' environment that evolves over time.
+        
+        Returns a dict with various path categories for the persona.
+        """
+        home = persona_data.get('home_dir', f'/home/{persona_name}')
+        
+        if "dev" in persona_name:
+            prompt = f"""
+            **TASK:** Generate realistic working directories and project paths for a senior backend developer named {persona_name}.
+            
+            **CONTEXT:**
+            - Home directory: {home}
+            - Current month: {context.get('monthly_arc', 'Backend API Migration') if context else 'Backend API Migration'}
+            - Current task: {context.get('daily_task', 'API development') if context else 'API development'}
+            
+            **REQUIREMENTS:**
+            Generate 5-8 realistic project directories and file paths that this developer would use.
+            Include a mix of active projects, archived work, and personal directories.
+            
+            **OUTPUT FORMAT:**
+            Return STRICT JSON:
+            {{
+                "active_projects": [
+                    "{home}/repos/backend-api",
+                    "{home}/repos/frontend-app", 
+                    "{home}/repos/core-services"
+                ],
+                "archived_projects": [
+                    "{home}/archive/old-api-v1",
+                    "{home}/archive/legacy-system"
+                ],
+                "personal_dirs": [
+                    "{home}/notes",
+                    "{home}/scripts",
+                    "{home}/experiments"
+                ],
+                "config_files": [
+                    "{home}/.gitconfig",
+                    "{home}/.ssh/config",
+                    "{home}/.aws/credentials"
+                ],
+                "current_workspace": "{home}/repos/backend-api"
+            }}
+            """
+        elif "sys" in persona_name or "admin" in persona_name:
+            prompt = f"""
+            **TASK:** Generate realistic system administration paths for {persona_name}.
+            
+            **CONTEXT:**
+            - Home directory: {home}
+            - Role: Senior Systems Administrator
+            - Current focus: Infrastructure maintenance and monitoring
+            
+            **OUTPUT FORMAT:**
+            Return STRICT JSON:
+            {{
+                "log_dirs": ["/var/log", "/var/log/nginx", "/var/log/postgresql"],
+                "config_dirs": ["/etc/nginx", "/etc/postgresql", "/etc/ssh"],
+                "backup_dirs": ["/mnt/backup", "/mnt/backup/logs", "/mnt/backup/config"],
+                "monitoring_scripts": ["{home}/scripts/monitor.sh", "{home}/scripts/backup.sh"],
+                "current_workspace": "/var/log"
+            }}
+            """
+        elif "svc" in persona_name or "ci" in persona_name:
+            prompt = f"""
+            **TASK:** Generate realistic CI/CD workspace paths for {persona_name}.
+            
+            **OUTPUT FORMAT:**
+            Return STRICT JSON:
+            {{
+                "workspaces": ["/var/lib/jenkins/workspace/backend-api", "/var/lib/jenkins/workspace/frontend"],
+                "artifacts": ["/var/lib/jenkins/artifacts", "/var/lib/jenkins/artifacts/releases"],
+                "scripts": ["/var/lib/jenkins/scripts/deploy.sh", "/var/lib/jenkins/scripts/build.sh"],
+                "current_workspace": "/var/lib/jenkins/workspace/backend-api"
+            }}
+            """
+        else:
+            # Generic user
+            prompt = f"""
+            **TASK:** Generate realistic user directories for {persona_name}.
+            
+            **OUTPUT FORMAT:**
+            Return STRICT JSON:
+            {{
+                "personal_dirs": ["{home}/documents", "{home}/downloads", "{home}/projects"],
+                "config_files": ["{home}/.bashrc", "{home}/.vimrc"],
+                "current_workspace": "{home}"
+            }}
+            """
+        
+        response = self._call_llm(prompt)
+        if response and isinstance(response, dict):
+            return response
+        
+        # Fallback to static paths if LLM fails
+        logger.warning(f"LLM path generation failed for {persona_name}, using fallbacks")
+        return self._get_fallback_paths(persona_name, home)
+    
+    def _get_fallback_paths(self, persona_name, home):
+        """Fallback paths when LLM generation fails."""
+        if "dev" in persona_name:
+            return {
+                "active_projects": [f"{home}/repos/backend-api", f"{home}/repos/frontend"],
+                "archived_projects": [f"{home}/archive/old-projects"],
+                "personal_dirs": [f"{home}/notes", f"{home}/scripts"],
+                "config_files": [f"{home}/.gitconfig"],
+                "current_workspace": f"{home}/repos/backend-api"
+            }
+        elif "sys" in persona_name or "admin" in persona_name:
+            return {
+                "log_dirs": ["/var/log", "/var/log/nginx"],
+                "config_dirs": ["/etc/nginx", "/etc/ssh"],
+                "backup_dirs": ["/mnt/backup"],
+                "monitoring_scripts": [f"{home}/scripts/monitor.sh"],
+                "current_workspace": "/var/log"
+            }
+        elif "svc" in persona_name or "ci" in persona_name:
+            return {
+                "workspaces": ["/var/lib/jenkins/workspace/backend-api"],
+                "artifacts": ["/var/lib/jenkins/artifacts"],
+                "scripts": ["/var/lib/jenkins/scripts/deploy.sh"],
+                "current_workspace": "/var/lib/jenkins/workspace/backend-api"
+            }
+        else:
+            return {
+                "personal_dirs": [f"{home}/documents"],
+                "config_files": [f"{home}/.bashrc"],
+                "current_workspace": home
+            }
 
     def _call_llm(self, prompt, retries=3):
         """
@@ -515,8 +642,10 @@ class LLMProvider:
         return current_triggers
 
     def _construct_prompt(self, name, data, context=None):
-        # 1. Unpack Context
+        # 1. Generate dynamic paths for this persona (living environment)
+        dynamic_paths = self.generate_dynamic_paths(name, data, context)
         home = data.get('home_dir', '/tmp')
+        current_workspace = dynamic_paths.get('current_workspace', home)
 
         # Default Context
         ctx_arc = "General System Maintenance"
@@ -536,37 +665,104 @@ class LLMProvider:
                 # Fallback to simple string if that's what was passed
                 ctx_task = context.get('monthly_task', ctx_task)
 
-        # 2. Define Persona Role & Voice
-        role_description = f"User: {name}\nHome Directory: {home}\nRole Type: "
+        # 2. Define Persona Role & Voice with dynamic paths
+        role_description = f"User: {name}\nHome Directory: {home}\nCurrent Workspace: {current_workspace}\nRole Type: "
 
         if "dev" in name:
             role_description += "Software Developer"
-            specific_instructions = """
+            active_projects = dynamic_paths.get('active_projects', [f"{home}/repos/backend-api"])
+            archived_projects = dynamic_paths.get('archived_projects', [f"{home}/archive/old-projects"])
+            personal_dirs = dynamic_paths.get('personal_dirs', [f"{home}/notes"])
+            
+            specific_instructions = f"""
             **BEHAVIOR**:
             - You are writing code, compiling, or debugging.
-            - Use realistic tools: git, vim/n, make, docker, kubectl, python, go.
+            - Use realistic tools: git, vim/nano, make, docker, kubectl, python, go.
             - If the task is 'Refactor', show `mv`, `sed`, or heavy git activity.
             - If the task is 'Feature', show `mkdir`, `touch`, and content injection.
+            
+            **DYNAMIC WORKING ENVIRONMENT**:
+            - Active Projects: {', '.join(active_projects)}
+            - Archived Work: {', '.join(archived_projects)}
+            - Personal Space: {', '.join(personal_dirs)}
+            - Current Focus: {current_workspace}
+            
+            **PATH USAGE RULES**:
+            - Primary workspace: {current_workspace}
+            - Create subdirectories if needed (mkdir -p)
+            - Use project-specific paths from the active projects list
+            - Reference archived projects for context/history
+            - NEVER use generic paths like /tmp/test or /home/user/project
             """
         elif "sys" in name or "admin" in name:
             role_description += "System Administrator"
-            specific_instructions = """
+            log_dirs = dynamic_paths.get('log_dirs', ['/var/log'])
+            config_dirs = dynamic_paths.get('config_dirs', ['/etc/nginx'])
+            backup_dirs = dynamic_paths.get('backup_dirs', ['/mnt/backup'])
+            monitoring_scripts = dynamic_paths.get('monitoring_scripts', [f"{home}/scripts/monitor.sh"])
+            
+            specific_instructions = f"""
             **BEHAVIOR**:
             - You are maintaining the infrastructure.
             - Use: systemctl, journalctl, grep, chown, chmod, vim /etc/..., apt/yum.
             - Focus on stability, logs, and configuration management.
+            
+            **DYNAMIC SYSTEM ENVIRONMENT**:
+            - Log Directories: {', '.join(log_dirs)}
+            - Config Locations: {', '.join(config_dirs)}
+            - Backup Storage: {', '.join(backup_dirs)}
+            - Monitoring Tools: {', '.join(monitoring_scripts)}
+            - Current Focus: {current_workspace}
+            
+            **PATH USAGE RULES**:
+            - Work in appropriate system directories
+            - Create backup directories if they don't exist (mkdir -p)
+            - Use log analysis commands on actual log files
+            - Reference real system paths, not generic placeholders
+            - NEVER use paths like /opt/sys_integrity/logs/ or /path/to/
             """
         elif "svc" in name or "ci" in name:
             role_description += "Automated Service / CI Bot"
-            specific_instructions = """
+            workspaces = dynamic_paths.get('workspaces', ['/var/lib/jenkins/workspace/backend-api'])
+            artifacts = dynamic_paths.get('artifacts', ['/var/lib/jenkins/artifacts'])
+            scripts = dynamic_paths.get('scripts', ['/var/lib/jenkins/scripts/deploy.sh'])
+            
+            specific_instructions = f"""
             **BEHAVIOR**:
             - You are a script or bot.
             - High speed, repetitive, precise commands.
             - Deploying artifacts, running tests, cleaning up tmp files.
+            
+            **DYNAMIC CI/CD ENVIRONMENT**:
+            - Build Workspaces: {', '.join(workspaces)}
+            - Artifact Storage: {', '.join(artifacts)}
+            - Automation Scripts: {', '.join(scripts)}
+            - Current Pipeline: {current_workspace}
+            
+            **PATH USAGE RULES**:
+            - Work in designated workspace directories
+            - Create artifact directories as needed
+            - Use real repository URLs, not placeholders
+            - Follow standard CI/CD directory structures
             """
         else:
             role_description += "Standard User"
-            specific_instructions = "**BEHAVIOR**: General command line usage."
+            personal_dirs = dynamic_paths.get('personal_dirs', [f"{home}/documents"])
+            config_files = dynamic_paths.get('config_files', [f"{home}/.bashrc"])
+            
+            specific_instructions = f"""
+            **BEHAVIOR**: General command line usage.
+            
+            **DYNAMIC USER ENVIRONMENT**:
+            - Personal Directories: {', '.join(personal_dirs)}
+            - Config Files: {', '.join(config_files)}
+            - Current Location: {current_workspace}
+            
+            **PATH USAGE RULES**:
+            - Work in personal directory spaces
+            - Create directories as needed for organization
+            - Use realistic file paths, not generic placeholders
+            """
 
         # 3. Define the Monthly Goal Context (The "Why")
         planning_context = f"""
@@ -626,13 +822,20 @@ class LLMProvider:
         {{
             "name": "Short Descriptive Title of Scene",
             "category": "Routine" | "Variant" | "Anomaly",
-            "zone": "/path/to/working/dir",
+            "zone": "/absolute/path/to/working/directory",
             "commands": [
                 "command 1",
                 "command 2",
                 ...
             ]
         }}
+
+        **CRITICAL PATH REQUIREMENTS**:
+        - 'zone' MUST be an absolute path that actually exists or can be created
+        - Commands MUST use specific, realistic paths (no placeholders like <FILENAME>)
+        - NEVER use generic paths like "/tmp/test", "/path/to/", "/opt/sys_integrity/"
+        - NEVER use placeholder URLs like "<REMOTE_REPOSITORY_URL_HERE>"
+        - Use the specific paths listed in your persona profile above
         """
 
         return prompt

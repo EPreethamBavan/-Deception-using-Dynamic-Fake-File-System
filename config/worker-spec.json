@@ -1,0 +1,134 @@
+{
+    "dev_alice": {
+        "work_hours": [
+            9,
+            17
+        ],
+        "probability": 0.8,
+        "home_dir": "/home/dev_alice",
+        "scenes": [
+            {
+                "name": "Backend API Development",
+                "category": "Routine",
+                "zone": "{home_dir}/repos/backend-api",
+                "commands": [
+                    "cd {home_dir}/repos/backend-api",
+                    "vim src/auth/handlers.py",
+                    "git status",
+                    "git add src/auth/",
+                    "git commit -m 'Implement JWT authentication handler'",
+                    "git push origin main"
+                ]
+            },
+            {
+                "name": "Debug Database Issues",
+                "category": "Variant",
+                "zone": "{home_dir}/repos/backend-api",
+                "commands": [
+                    "cd {home_dir}/repos/backend-api",
+                    "tail -20 /var/log/postgresql/postgresql-13-main.log",
+                    "grep 'connection refused' /var/log/postgresql/postgresql-13-main.log",
+                    "vim src/db/connection.py",
+                    "python -m pytest tests/db/test_connection.py -v"
+                ]
+            },
+            {
+                "name": "Security Hotfix",
+                "category": "Anomaly",
+                "zone": "{home_dir}/repos/backend-api",
+                "commands": [
+                    "cd {home_dir}/repos/backend-api",
+                    "git checkout -b hotfix-auth-bypass-CVE-2024-1234",
+                    "vim src/auth/middleware.py",
+                    "python -m pytest tests/auth/test_security.py -v",
+                    "git add .",
+                    "git commit -m 'SECURITY: Fix authentication bypass vulnerability'",
+                    "git push origin hotfix-auth-bypass-CVE-2024-1234"
+                ]
+            }
+        ]
+    },
+    "sys_bob": {
+        "work_hours": [
+            8,
+            16
+        ],
+        "probability": 0.6,
+        "home_dir": "/home/sys_bob",
+        "scenes": [
+            {
+                "name": "Daily System Health Check",
+                "category": "Routine",
+                "zone": "{home_dir}",
+                "commands": [
+                    "uptime",
+                    "df -h",
+                    "free -h",
+                    "systemctl status nginx postgresql",
+                    "tail -20 /var/log/nginx/error.log",
+                    "tail -20 /var/log/postgresql/postgresql-13-main.log"
+                ]
+            },
+            {
+                "name": "Security Log Analysis",
+                "category": "Variant",
+                "zone": "/var/log",
+                "commands": [
+                    "sudo grep 'Failed password' /var/log/auth.log | tail -20",
+                    "sudo last -20",
+                    "sudo netstat -tulpn | grep LISTEN",
+                    "sudo iptables -L -n"
+                ]
+            },
+            {
+                "name": "Backup Operations",
+                "category": "Routine",
+                "zone": "/mnt/backup",
+                "commands": [
+                    "tar -czf /mnt/backup/config-$(date +%Y%m%d).tar.gz /etc/nginx /etc/postgresql /etc/ssh",
+                    "rsync -av /var/log/ /mnt/backup/logs/",
+                    "find /mnt/backup -name '*.tar.gz' -mtime +30 -delete"
+                ]
+            }
+        ]
+    },
+    "svc_ci": {
+        "work_hours": [
+            0,
+            23
+        ],
+        "probability": 0.0,
+        "home_dir": "/var/lib/jenkins",
+        "scenes": [
+            {
+                "name": "Backend API Build Pipeline",
+                "category": "Routine",
+                "zone": "{home_dir}/workspace/backend-api",
+                "commands": [
+                    "cd {home_dir}/workspace/backend-api",
+                    "git fetch origin",
+                    "git checkout main",
+                    "git pull",
+                    "make clean",
+                    "make build",
+                    "make test",
+                    "docker build -t backend-api:${BUILD_NUMBER} .",
+                    "docker push registry.internal/backend-api:${BUILD_NUMBER}"
+                ]
+            },
+            {
+                "name": "Frontend Deployment",
+                "category": "Routine",
+                "zone": "{home_dir}/workspace/frontend",
+                "commands": [
+                    "cd {home_dir}/workspace/frontend",
+                    "npm install",
+                    "npm run build",
+                    "npm run test",
+                    "rsync -av dist/ /var/www/html/",
+                    "systemctl reload nginx"
+                ]
+            }
+        ]
+    }
+}

@@ -18,11 +18,7 @@ PYTHON_FILES=(
 
 # Configuration files
 CONFIG_FILES=(
-    "worker-spec.json"
-    "config.json"
-    "templates.json"
-    "triggers.json"
-    "monthly_plan.json"
+    "config/"
 )
 
 # Deployment files
@@ -30,6 +26,7 @@ DEPLOY_FILES=(
     "setup_linux.sh"
     "requirements.txt"
     "DEPLOYMENT.md"
+    "tests/"
 )
 
 # Check all files exist
