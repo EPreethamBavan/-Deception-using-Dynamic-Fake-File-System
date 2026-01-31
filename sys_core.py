@@ -98,6 +98,9 @@ class SystemMonitor:
         # Initialize Content Manager (Modular Asset Storage)
         self.content_manager = ContentManager(self.llm_provider) if self.use_llm else None
 
+        # Track last timestamp to prevent collision in fast execution
+        self.last_history_timestamp = 0
+
         # Dynamic Personas via ContentManager if available, else static
         if self.content_manager:
             self.personas = self.content_manager.load_personas(self.spec_file)
@@ -741,8 +744,13 @@ class SystemMonitor:
                     os.makedirs(os.path.dirname(history_file), exist_ok=True)
 
                     # Enhanced format with timestamp (HISTTIMEFORMAT style)
+                    current_time = int(time.time())
+                    if current_time <= self.last_history_timestamp:
+                        current_time = self.last_history_timestamp + random.randint(1, 4)
+                    self.last_history_timestamp = current_time
+
                     with open(history_file, "a") as hf:
-                        hf.write(f"#{int(time.time())}\n")
+                        hf.write(f"#{current_time}\n")
                         hf.write(f"{cmd}\n")
                 except Exception as e:
                     logger.warning(f"Failed to update bash_history: {e}")

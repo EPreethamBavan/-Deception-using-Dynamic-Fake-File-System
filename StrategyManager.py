@@ -196,7 +196,9 @@ class StrategyManager:
                  crumb = self.content_manager.get_breadcrumb()
                  if not crumb:
                      self.content_manager.generate_breadcrumbs() # Replenish
-                     crumb = "echo 'Replenishing breadcrumbs...'"
+                     crumb = self.content_manager.get_breadcrumb() # Retry fetch
+                     if not crumb:
+                         crumb = "Error: Connection check failed - timeout"
                  
                  tpl = self.content_manager.get_template("breadcrumb_leak")
                  if tpl:
