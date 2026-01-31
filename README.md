@@ -72,6 +72,9 @@ This implementation supports the research paper:
 
 ## Key Features
 
+- **Proactive Defense Agent**: OODA-loop powered decision engine (`DefenderAgent`) that adapts strategy based on observations
+- **Persona Skill System**: Real tool execution (Git, Docker) via specialized skills (`skills/`) for high-fidelity deception
+- **Persistent Memory**: Long-term story arc tracking for consistent multi-session narratives
 - **Dynamic Path Generation**: LLM-powered generation of realistic, persona-specific directory structures
 - **Intelligent Directory Creation**: Automatic creation of necessary directories based on command analysis
 - **Modular Architecture**: Clean separation of concerns with configurable components

@@ -23,7 +23,9 @@ def create_deployment_zip():
         "config",
         "tests",
         "docs",
-        "logs" 
+        "docs",
+        "logs",
+        "skills"
     ]
 
     EXCLUDES = [

@@ -133,6 +133,15 @@ install_source() {
     else
         log_warn "  - Tests directory not found (optional)"
     fi
+
+    # Copy skills directory (Agentic Deception)
+    if [[ -d "skills" ]]; then
+        cp -r "skills" "$SRC_DIR/"
+        log_info "  - Copied skills directory"
+    else
+        log_error "  - Skills directory not found! Agentic features will fail."
+        exit 1
+    fi
 }
 
 # ============================================

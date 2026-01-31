@@ -94,6 +94,7 @@ class ContentManager:
                 "current_day": 1,
                 "created_files": {}, # logical_path -> {summary, last_modified}
                 "knowledge_graph": {}, # symbol -> file_path
+                "story_arcs": {}, # user -> {current_arc, progress, notes}
                 "build_status": "passing"
             }
             self.save_project_state()
@@ -117,6 +118,18 @@ class ContentManager:
             with open(file_path, 'r') as f:
                 return f.read()
         return "[FILE NOT FOUND]"
+
+    def get_story_arc(self, user):
+        """Retrieves the current standing story arc for a user."""
+        return self.project_state.get("story_arcs", {}).get(user, "Standard Maintenance")
+
+    def update_story_arc(self, user, arc_info):
+        """Updates the persistent story arc for a user."""
+        if "story_arcs" not in self.project_state:
+            self.project_state["story_arcs"] = {}
+        
+        self.project_state["story_arcs"][user] = arc_info
+        self.save_project_state()
 
     # --- Forecast Features ---
     def generate_forecast(self, count=20):

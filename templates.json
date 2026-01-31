@@ -1,0 +1,74 @@
+{
+    "triggered_response": {
+        "name": "Response to {keyword}",
+        "category": "Responsive",
+        "zone": "/tmp",
+        "commands": [
+            "echo 'Handling trigger: {keyword}'",
+            "date"
+        ]
+    },
+    "narrative": {
+        "name": "Narrative Task: {task}",
+        "category": "Routine",
+        "zone": "/home/dev_alice",
+        "commands": [
+            "echo 'Starting task: {task}'",
+            "ls -la"
+        ]
+    },
+    "maintenance_refresh": {
+        "name": "System Maintenance (Asset Refresh)",
+        "category": "Maintenance",
+        "zone": "/var/log",
+        "commands": [
+            "echo 'Maintenance Complete'",
+            "Truncating logs..."
+        ]
+    },
+    "breadcrumb_leak": {
+        "name": "Accidental Leak (Breadcrumb)",
+        "category": "Anomaly",
+        "zone": "/tmp",
+        "commands": [
+            "echo '{crumb}' >> debug.log"
+        ]
+    },
+    "cache": {
+        "name": "Cached Maintenance",
+        "category": "Routine",
+        "zone": "/var/log",
+        "commands": [
+            "tail -f syslog"
+        ]
+    },
+    "fuzzing": {
+        "files": [
+            "utils.py",
+            "config.yaml",
+            "main.go"
+        ],
+        "commit_messages": [
+            "Fix typo",
+            "Update config",
+            "Refactor"
+        ]
+    },
+    "typos": {
+        "git": [
+            "gti",
+            "got",
+            "gut"
+        ],
+        "docker": [
+            "dockr",
+            "docekr"
+        ]
+    },
+    "vuln": [
+        "chmod 777 -R /var/www"
+    ],
+    "honeytoken": [
+        "echo 'aws_key=AKIA...' > ~/.aws/credentials"
+    ]
+}

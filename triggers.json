@@ -1,0 +1,16 @@
+[
+    {
+        "target": "sys_bob",
+        "scene_keyword": "restart_service",
+        "event": "server_down",
+        "source": "any",
+        "pattern": "500 Internal Server Error"
+    },
+    {
+        "target": "dev_alice",
+        "scene_keyword": "check_logs",
+        "event": "anomaly_alert",
+        "source": "any",
+        "pattern": "Unauthorized Access"
+    }
+]

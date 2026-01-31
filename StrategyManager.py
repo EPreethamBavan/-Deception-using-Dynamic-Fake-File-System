@@ -17,6 +17,9 @@ class StrategyManager:
         self.contextual_noise = ContextualNoise(self.content_manager)
         self.honeytoken_factory = HoneytokenFactory(self.content_manager)
         self.vuln_feint = VulnerabilityFeint(self.content_manager)
+        
+        # Initialize Defender Agent (OODA Loop)
+        self.defender_agent = DefenderAgent(self.llm, self.content_manager)
 
     def select_strategy(self, strategy_flag):
         """
@@ -137,90 +140,190 @@ class StrategyManager:
         return self.vuln_feint.generate()
 
     def execute_hybrid(self):
-        """Strategy 7: Hybrid (The Professional Deceiver)"""
-        roll = random.random()
+        """Strategy 7: Hybrid (The Professional Deceiver) - Powered by OODA Loop."""
+        # Use the Defender Agent to decide (OODA Loop)
+        decision = self.defender_agent.decide()
         
-        if roll < 0.25 and self.orch.use_llm:
+        logger.info(f"[Defender Agent] Decision: {decision['strategy']} ({decision['reason']})")
+        
+        if decision['strategy'] == "LIVE_LLM":
             user = random.choice(list(self.orch.personas.keys()))
-            logger.info(f"[Hybrid] Chose LIVE LLM for {user}")
-            return ("LLM_DELEGATE", user) 
+            return ("LLM_DELEGATE", user)
 
-        elif roll < 0.45 and self.content_manager:
+        elif decision['strategy'] == "SKILL":
+            return self.execute_skill()
+
+        elif decision['strategy'] == "FORECAST":
             scene = self.execute_forecast()
-            if scene:
-                logger.info("[Hybrid] Chose Forecast Strategy")
-                return scene
-            logger.info("[Hybrid] Forecast Empty -> Fallback to Template")
-            return self.execute_template()
+            if scene: return scene
+            return self.execute_template() # Fallback
 
-        elif roll < 0.70:
-            logger.info("[Hybrid] Chose Template Strategy")
+        elif decision['strategy'] == "TEMPLATE":
             return self.execute_template()
             
-        elif roll < 0.90:
-            logger.info("[Hybrid] Chose Cache Strategy")
+        elif decision['strategy'] == "CACHE":
             user = "sys_bob"
             selected_scene = self.execute_cache()
             return (user, selected_scene)
             
-        elif roll < 0.95:
-            logger.info("[Hybrid] Chose Honeytoken Strategy")
+        elif decision['strategy'] == "HONEYTOKEN":
             return self.execute_honeytoken()
             
-        elif roll < 0.98:
-            logger.info("[Hybrid] Chose Vulnerability Strategy")
+        elif decision['strategy'] == "VULN":
             return self.execute_vuln()
             
-        elif self.content_manager:
-            # 2% Chance of Auto-Refresh (Self-Healing)
-            if random.random() < 0.5:
-                logger.info("[Hybrid] Triggering Content Auto-Refresh")
-                self.content_manager.refresh_assets()
-                
-                scene = self.content_manager.get_template("maintenance_refresh")
-                if not scene: # Safe fallback if template missing
-                     scene = {
-                        "name": "System Maintenance (Asset Refresh)",
-                        "category": "Maintenance",
-                        "zone": "/var/log",
-                        "commands": ["echo 'Maintenance Complete'"]
-                     }
-                return ("sys_bob", scene)
+        elif decision['strategy'] == "MAINTENANCE":
+            # Self-Healing / Refresh
+            self.content_manager.refresh_assets()
+            scene = self.content_manager.get_template("maintenance_refresh")
+            if not scene:
+                 scene = {
+                    "name": "System Maintenance (Asset Refresh)",
+                    "category": "Maintenance",
+                    "zone": "/var/log",
+                    "commands": ["echo 'Maintenance Complete'"]
+                 }
+            return ("sys_bob", scene)
 
-            elif random.random() < 0.5:
-                 # 1% Chance Persona Evolution
-                 self.content_manager.evolve_personas()
-                 return None # No scene, just background task
-            else:
-                 # 1% Chance Breadcrumb Planting
-                 crumb = self.content_manager.get_breadcrumb()
+        elif decision['strategy'] == "BREADCRUMB":
+             crumb = self.content_manager.get_breadcrumb()
+             if not crumb:
+                 self.content_manager.generate_breadcrumbs()
+                 crumb = self.content_manager.get_breadcrumb() # Retry
                  if not crumb:
-                     self.content_manager.generate_breadcrumbs() # Replenish
-                     crumb = self.content_manager.get_breadcrumb() # Retry fetch
-                     if not crumb:
-                         crumb = "Error: Connection check failed - timeout"
-                 
-                 tpl = self.content_manager.get_template("breadcrumb_leak")
-                 if tpl:
-                     scene = json.loads(json.dumps(tpl)) # Deep Copy
-                     scene["commands"] = [c.format(crumb=crumb) for c in scene["commands"]]
-                 else:
-                     scene = {
-                         "name": "Accidental Leak (Breadcrumb)",
-                         "category": "Anomaly",
-                         "zone": "/tmp",
-                         "commands": [f"echo '{crumb}' >> debug.log"]
-                     }
-
-                 return ("dev_alice", scene)
+                     crumb = "Error: Connection check failed - timeout"
+             
+             tpl = self.content_manager.get_template("breadcrumb_leak")
+             if tpl:
+                 scene = json.loads(json.dumps(tpl))
+                 scene["commands"] = [c.format(crumb=crumb) for c in scene["commands"]]
+             else:
+                 scene = {
+                     "name": "Accidental Leak (Breadcrumb)",
+                     "category": "Anomaly",
+                     "zone": "/tmp",
+                     "commands": [f"echo '{crumb}' >> debug.log"]
+                 }
+             return ("dev_alice", scene)
 
         else:
-            return self.execute_vuln() # Fallback if no content manager
+            return self.execute_template()
+
+    def execute_skill(self):
+        """Executes a Skill (OpenClaw-style tool use)."""
+        # Pick a persona with skills
+        candidates = [p for p, data in self.orch.personas.items() if "skills" in data]
+        if not candidates: return self.execute_template()
+        
+        user = random.choice(candidates)
+        user_data = self.orch.personas[user]
+        user_skills = user_data.get("skills", [])
+        home = user_data.get("home_dir", f"/home/{user}")
+        
+        # Dynamic Import / Instantiation
+        # heuristic: map string "git" to GitSkill class
+        skill_map = {
+            "git": "GitSkill",
+            "docker": "DockerSkill"
+        }
+        
+        selected_skill_name = None
+        for s in user_skills:
+            if s in skill_map:
+                selected_skill_name = s
+                break
+        
+        if not selected_skill_name: return self.execute_template()
+        
+        # Instantiate and run
+        try:
+            # Local import to avoid circular dependency issues at top level
+            if selected_skill_name == "git":
+                from skills.git_skill import GitSkill
+                skill = GitSkill(user, home)
+            elif selected_skill_name == "docker":
+                from skills.docker_skill import DockerSkill
+                skill = DockerSkill(user, home)
+            else:
+                 return self.execute_template()
+                 
+            commands = skill.generate_activity()
+            
+            return (user, {
+                "name": f"Skill Execution: {selected_skill_name.title()}",
+                "category": "Skill",
+                "zone": home,
+                "commands": commands
+            })
+        except Exception as e:
+            logger.error(f"Skill execution failed: {e}")
+            return self.execute_template()
+
     
     def apply_noise(self, commands):
         """Applies 'Contextual Noise' to ANY command list."""
         return self.contextual_noise.inject(commands)
 
+
+# --- Agentic Defender (OODA Loop) ---
+class DefenderAgent:
+    """
+    Implements the Observe-Orient-Decide-Act (OODA) loop for proactive deception.
+    """
+    def __init__(self, llm, content_manager):
+        self.llm = llm
+        self.cm = content_manager
+        self.state = {
+            "alert_level": "LOW",
+            "last_action": None,
+            "consecutive_idle": 0
+        }
+
+    def decide(self):
+        """
+        Executes the OODA loop to select the next best strategy.
+        """
+        # 1. OBSERVE (Mocked for now - normally would read logs/history)
+        # In a real implementation, we'd check if an attacker is probing.
+        # For now, we simulate 'Alert Level' changes based on RNG or mock triggers.
+        observation = self._observe_environment()
+        
+        # 2. ORIENT (Context analysis)
+        # 3. DECIDE (Select Strategy)
+        if observation == "ATTACK_DETECTED":
+            return {"strategy": "HONEYTOKEN", "reason": "Attack detected, deploying honeytoken"}
+        
+        elif observation == "PROBING_DETECTED":
+            return {"strategy": "VULN", "reason": "Probing detected, feigning vulnerability"}
+            
+        elif observation == "SYSTEM_STALE":
+            return {"strategy": "MAINTENANCE", "reason": "System stale, refreshing assets"}
+            
+        else:
+            # Standard probabilistic mix for "NORMAL" state
+            roll = random.random()
+            if roll < 0.30 and self.llm: return {"strategy": "LIVE_LLM", "reason": "Normal traffic generation (LLM)"}
+            if roll < 0.45: return {"strategy": "SKILL", "reason": "Persona using specialized skill"}
+            if roll < 0.60: return {"strategy": "FORECAST", "reason": "Executing planned forecast"}
+            if roll < 0.70: return {"strategy": "TEMPLATE", "reason": "Standard template activity"}
+            if roll < 0.85: return {"strategy": "CACHE", "reason": "Cached background noise"}
+            if roll < 0.90: return {"strategy": "BREADCRUMB", "reason": "Leaking info"}
+            if roll < 0.95: return {"strategy": "HONEYTOKEN", "reason": "Random trap placement"}
+            return {"strategy": "VULN", "reason": "Random vulnerability feint"}
+
+    def _observe_environment(self):
+        """
+        Simulates observing system state. 
+        TODO: Connect to actual 'sys_core.py' metrics or logic.
+        """
+        # Simple simulation logic
+        if random.random() < 0.05: return "ATTACK_DETECTED"
+        if random.random() < 0.10: return "PROBING_DETECTED"
+        
+        # Check if we should refresh
+        if random.random() < 0.02: return "SYSTEM_STALE"
+        
+        return "NORMAL"
 
 # --- Dynamic Factories ---
 class HoneytokenFactory:

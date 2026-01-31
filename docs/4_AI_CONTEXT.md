@@ -11,7 +11,7 @@ Feed this document to any AI assistant when you need help with the MIRAGE projec
 
 A honeypot deception system that uses LLMs (Google Gemini) to generate realistic fake user activity. Unlike traditional honeypots that are empty or static, MIRAGE proactively creates believable file system artifacts, bash histories, and ongoing "work" from simulated users.
 
-**Key Innovation**: Proactive generation (creates activity before attackers arrive) rather than reactive (responding to attacker commands).
+**Key Innovation**: Proactive "Agentic" generation (Defender Agent + OODA Loop) rather than just random scripts.
 
 ---
 
@@ -27,8 +27,13 @@ A honeypot deception system that uses LLMs (Google Gemini) to generate realistic
 │  │             │───▶│  │Smart Timer│ │ Script Picker│     │    │
 │  │ dev_alice   │    │  └───────────┘ └──────────────┘     │    │
 │  │ sys_bob     │    │         ┌──────────────┐            │    │
-│  │ svc_ci      │    │         │Story Planner │            │    │
-│  └─────────────┘    │         └──────────────┘            │    │
+│  │             │    │         │Defender Agent│ (OODA Loop)│    │
+│  │             │    │         └──────┬───────┘            │    │
+│  │             │    │                │                    │    │
+│  └─────────────┘    │         ┌──────▼───────┐            │    │
+│         │           │         │ Skill System │            │    │
+│         │           │         │ (Git,Docker) │            │    │
+│         │           │         └──────────────┘            │    │
 │         │           └──────────────────┬──────────────────┘    │
 │         │                              │                        │
 │         ▼                              ▼                        │
@@ -64,8 +69,9 @@ A honeypot deception system that uses LLMs (Google Gemini) to generate realistic
 project/
 ├── sys_core.py              # Main orchestrator, entry point
 ├── LLM_Provider.py          # Gemini API wrapper
-├── ContentManager.py        # File read/write operations
-├── StrategyManager.py       # Timing and scheduling logic
+├── ContentManager.py        # File read/write, Persistent Memory (Story Arcs)
+├── StrategyManager.py       # Defender Agent (OODA Loop) & Strategy selection
+├── skills/                  # Persona Skills (Git, Docker, etc.)
 ├── ActiveDefense.py         # Active response to threats
 ├── AntiFingerprint.py       # /proc simulation, attacker detection
 ├── UserArtifactGenerator.py # Creates .bashrc, .gitconfig, etc.
@@ -89,6 +95,17 @@ Main entry point. Runs as daemon. Coordinates all other modules.
 python sys_core.py --loop --strategy-hybrid --llm  # Production
 python sys_core.py --dry-run --llm                 # Testing
 ```
+
+### 2. StrategyManager.py (Defender Agent)
+The "Brain" of the operation.
+- **DefenderAgent**: Implements an OODA loop (Observe-Orient-Decide-Act).
+- **Decider**: Chooses between `LIVE_LLM`, `SKILL`, `FORECAST`, or `TEMPLATE` based on system state.
+
+### 3. Skills System (`skills/`)
+Implements actual tool logic for personas:
+- `GitSkill`: Initializes repos, commits, pushes.
+- `DockerSkill`: Manages containers.
+Replaces generic "echo" commands with real, verifiable actions.
 
 ### 2. AntiFingerprint.py
 Three main classes:

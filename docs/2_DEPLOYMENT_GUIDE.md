@@ -227,6 +227,7 @@ cat /proc/meminfo
 │   ├── AntiFingerprint.py    # /proc simulation
 │   ├── UserArtifactGenerator.py  # User files
 │   └── PromptEngine.py       # SPADE prompts
+│   └── skills/               # Persona Skills (Git, Docker, etc.)
 ├── config/
 │   ├── .env                  # API key (permissions 600)
 │   ├── config.json           # Main config

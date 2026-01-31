@@ -517,6 +517,7 @@ class SystemMonitor:
                                     "current_day": daily_task_info.get("day", 1),
                                     "daily_task": daily_task_info.get("focus", "General Maintenance")
                                 },
+                                "story_arc": self.content_manager.get_story_arc(name) if self.content_manager else "Generic",
                                 "recent_history": self.state.get('users', {}).get(name, {}).get('last_scene', "None")
                             }
                             scene = self.select_scene(name, data, context=context, force_llm=True) 
@@ -542,6 +543,7 @@ class SystemMonitor:
                             "current_day": daily_task_info.get("day", 1),
                             "daily_task": daily_task_info.get("focus", "General Maintenance")
                         },
+                        "story_arc": self.content_manager.get_story_arc(name) if self.content_manager else "Generic",
                         "recent_history": self.state.get('users', {}).get(name, {}).get('last_scene', "None")
                      }
                      scene = self.select_scene(name, data, context=context)

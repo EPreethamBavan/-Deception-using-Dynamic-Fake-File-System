@@ -4,6 +4,10 @@
             9,
             17
         ],
+        "skills": [
+            "git",
+            "docker"
+        ],
         "probability": 0.8,
         "home_dir": "/home/dev_alice",
         "scenes": [
@@ -53,6 +57,9 @@
             8,
             16
         ],
+        "skills": [
+            "bash"
+        ],
         "probability": 0.6,
         "home_dir": "/home/sys_bob",
         "scenes": [
@@ -97,38 +104,43 @@
             0,
             23
         ],
-        "probability": 0.0,
-        "home_dir": "/var/lib/jenkins",
-        "scenes": [
-            {
-                "name": "Backend API Build Pipeline",
-                "category": "Routine",
-                "zone": "{home_dir}/workspace/backend-api",
-                "commands": [
-                    "cd {home_dir}/workspace/backend-api",
-                    "git fetch origin",
-                    "git checkout main",
-                    "git pull",
-                    "make clean",
-                    "make build",
-                    "make test",
-                    "docker build -t backend-api:${BUILD_NUMBER} .",
-                    "docker push registry.internal/backend-api:${BUILD_NUMBER}"
-                ]
-            },
-            {
-                "name": "Frontend Deployment",
-                "category": "Routine",
-                "zone": "{home_dir}/workspace/frontend",
-                "commands": [
-                    "cd {home_dir}/workspace/frontend",
-                    "npm install",
-                    "npm run build",
-                    "npm run test",
-                    "rsync -av dist/ /var/www/html/",
-                    "systemctl reload nginx"
-                ]
-            }
-        ]
-    }
+    ],
+    "skills": [
+        "git",
+        "docker"
+    ],
+    "probability": 0.0,
+    "home_dir": "/var/lib/jenkins",
+    "scenes": [
+        {
+            "name": "Backend API Build Pipeline",
+            "category": "Routine",
+            "zone": "{home_dir}/workspace/backend-api",
+            "commands": [
+                "cd {home_dir}/workspace/backend-api",
+                "git fetch origin",
+                "git checkout main",
+                "git pull",
+                "make clean",
+                "make build",
+                "make test",
+                "docker build -t backend-api:${BUILD_NUMBER} .",
+                "docker push registry.internal/backend-api:${BUILD_NUMBER}"
+            ]
+        },
+        {
+            "name": "Frontend Deployment",
+            "category": "Routine",
+            "zone": "{home_dir}/workspace/frontend",
+            "commands": [
+                "cd {home_dir}/workspace/frontend",
+                "npm install",
+                "npm run build",
+                "npm run test",
+                "rsync -av dist/ /var/www/html/",
+                "systemctl reload nginx"
+            ]
+        }
+    ]
+}
 }

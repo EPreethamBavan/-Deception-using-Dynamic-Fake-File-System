@@ -137,6 +137,21 @@ This is the most critical part for the panel. We need to prove the system create
 
 ---
 
+### 3.4 Agentic Feature Verification (New)
+Validate the PROACTIVE features (Defender Agent & Skills):
+
+```bash
+# Run with hybrid strategy
+python sys_core.py --llm --strategy-hybrid --dry-run
+```
+
+**Look for in logs:**
+1.  **Defender Decision:** `[Defender Agent] Decision: ...` (e.g., `SKILL`, `LIVE_LLM`).
+2.  **Skill Execution:** `Skill Execution: Git` or `Skill Execution: Docker` in the scene description.
+3.  **Memory Usage:** References to "Story Arc" or "Project State" in debug logs (if enabled).
+
+---
+
 ## Final Checklist for Panel Submission
 - [ ] All 22 Unit Tests PASS.
 - [ ] Dry Run executes without crashing.

@@ -1,0 +1,33 @@
+{
+    "forecast_queue": [],
+    "assets": {
+        "vuln_commands": [],
+        "honeytoken_commands": []
+    },
+    "personas": {
+        "dev_alice": {
+            "home_dir": "/home/dev_alice",
+            "role": "Senior Developer",
+            "skills": [
+                "python",
+                "docker"
+            ]
+        },
+        "sys_bob": {
+            "home_dir": "/home/sys_bob",
+            "role": "SysAdmin",
+            "skills": [
+                "bash",
+                "ansible"
+            ]
+        },
+        "svc_ci": {
+            "home_dir": "/var/lib/jenkins",
+            "role": "CI Bot",
+            "skills": [
+                "git",
+                "make"
+            ]
+        }
+    }
+}
