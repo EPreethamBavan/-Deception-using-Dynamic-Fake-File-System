@@ -334,7 +334,7 @@ Host dev-*
 
     def _generate_vim_artifacts(self, home_dir: str):
         """Generate Vim configuration and history."""
-        vimrc = """" Vim configuration
+        vimrc = """\" Vim configuration
 " Last updated dynamically
 
 set nocompatible
